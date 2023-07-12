@@ -1,4 +1,4 @@
-nyx.load_balance_int = 10
+nyx.load_balance_int = 3
 nyx.load_balance_start_z = 199
   
 nyx.dual_grid = 1
@@ -38,7 +38,7 @@ gravity.mlmg_consolidation=1
 nyx.reuse_mlpoisson = 1
 
 nyx.initial_z = 159.0
-nyx.final_z = 1.0
+nyx.final_z = 0.5
 
 #File written during the run: nstep | time | dt | redshift | a
 amr.data_log = runlog
@@ -46,7 +46,7 @@ amr.data_log = runlog
 
 #This is how we restart from a checkpoint and write an ascii particle file
 #Leave this commented out in cvs version
-amr.restart = chk00404
+amr.restart = chk00446
 #max_step = 4
 #particles.particle_output_file = particle_output
 

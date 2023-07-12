@@ -2,6 +2,7 @@
 
 #include <DarkMatterParticleContainer.H>
 
+
 using namespace amrex;
 
 /// These are helper functions used when initializing from a morton-ordered
@@ -205,6 +206,456 @@ void DarkMatterParticleContainer::countParticle(int lev, iMultiFab& np_mf)
 }
 //ACJ
 
+//ACJ
+Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_target, Box& fbox0, Vector<Box>& fbl_vec, iMultiFab& np_mf_f, int & new_box_np, int lev)
+{
+    const IArrayBox&         np_fab = np_mf_f[o_box_id];
+    Array4<int const> const& np_arr = np_fab.const_array();
+    const int*               np_ptr = np_arr.dataPtr();
+    
+    Box     remain = fbox0;
+    IntVect lo     = fbox0.smallEnd();
+    IntVect stride   {1, fbox0.length(0), fbox0.length(0) * fbox0.length(1)};
+    
+    int np_target_lo = static_cast<int>(np_target * 0.95);
+    int np_target_hi = static_cast<int>(np_target * 1.05);
+    int min_chop_dir = -1;
+
+    Vector<int> np_cutoff_bydir (AMREX_SPACEDIM);
+    Vector<int> np_surface_bydir(AMREX_SPACEDIM);
+    Vector<int> chop_pos_bydir  (AMREX_SPACEDIM);
+
+    for (int chop_dir=0; chop_dir<AMREX_SPACEDIM; ++chop_dir) {
+      if (remain.length(chop_dir) < 2*greedy_min_grid_size) {
+        np_surface_bydir[chop_dir] = std::numeric_limits<int>::max();
+        np_cutoff_bydir [chop_dir] = std::numeric_limits<int>::max();
+        chop_pos_bydir  [chop_dir] = -1;
+        continue;
+      }
+
+      int dir0 = (chop_dir + 1) % AMREX_SPACEDIM;
+      int dir1 = (chop_dir + 2) % AMREX_SPACEDIM;
+
+      int chop_lo  = remain.smallEnd(chop_dir) + greedy_min_grid_size;
+      int chop_hi  = remain.bigEnd(chop_dir);
+      int chop_pos = chop_hi;
+
+      int np_tmp       = 0;
+      int np_diff_prev = np_target + 1;
+
+      // find the chop position with the closest np to np_target
+      while (chop_pos >= chop_lo) {
+        int np_slice = 0;
+        for (int idir0=remain.smallEnd(dir0); idir0<=remain.bigEnd(dir0); ++idir0) {
+          for (int idir1=remain.smallEnd(dir1); idir1<=remain.bigEnd(dir1); ++idir1) {
+          // the index is based on the offset to the lower bound of the original box
+            int iCell = stride[dir0]     * (idir0    - lo[dir0])
+                      + stride[dir1]     * (idir1    - lo[dir1])
+                      + stride[chop_dir] * (chop_pos - lo[chop_dir]);
+            np_slice += *(np_ptr + iCell);
+          }
+        }
+
+        int np_diff = std::abs(np_target - np_tmp - np_slice);
+        if (np_diff > np_diff_prev && chop_hi - chop_pos + 1 >= greedy_min_grid_size) {
+          ++chop_pos;
+          break;
+        }
+        else {
+          np_diff_prev = np_diff;
+          np_tmp      += np_slice;
+          --chop_pos;
+        }
+      }// end while
+      chop_pos = chop_pos == chop_lo-1 ? chop_lo : chop_pos;
+
+      np_cutoff_bydir[chop_dir] = np_tmp;
+      chop_pos_bydir [chop_dir] = chop_pos;
+
+      // count surface particles
+      Box remain_copy(remain);
+      Box cutoff     (remain_copy.chop(chop_dir, chop_pos));
+      int np_surface = 0;
+      // z faces
+      for (int j=cutoff.smallEnd(1); j<=cutoff.bigEnd(1); ++j) {
+        for (int i=cutoff.smallEnd(0); i<=cutoff.bigEnd(0); ++i) {
+          np_surface += np_arr(i, j, cutoff.smallEnd(2), 0);
+          np_surface += np_arr(i, j, cutoff.bigEnd  (2), 0);
+        }
+      }
+      // y faces
+      for (int k=cutoff.smallEnd(2); k<=cutoff.bigEnd(2); ++k) {
+        for (int i=cutoff.smallEnd(0); i<=cutoff.bigEnd(0); ++i) {
+          np_surface += np_arr(i, cutoff.smallEnd(1), k, 0);
+          np_surface += np_arr(i, cutoff.bigEnd  (1), k, 0);
+        }
+      }
+      // x faces
+      for (int k=cutoff.smallEnd(2); k<=cutoff.bigEnd(2); ++k) {
+        for (int j=cutoff.smallEnd(1); j<=cutoff.bigEnd(1); ++j) {
+          np_surface += np_arr(cutoff.smallEnd(0), j, k, 0);
+          np_surface += np_arr(cutoff.bigEnd  (0), j, k, 0);
+        }
+      }
+      np_surface_bydir[chop_dir] = np_surface;
+    }// end for chop_dir
+
+    Vector<int> within_toler_dirs;
+    for (int chop_dir=0; chop_dir<AMREX_SPACEDIM; ++chop_dir) {
+      if (  np_cutoff_bydir[chop_dir] >= np_target_lo
+         && np_cutoff_bydir[chop_dir] <= np_target_hi) {
+        within_toler_dirs.push_back(chop_dir);
+      }
+    }
+
+    // if none of the dir fits, choose the one closest to fit
+    if (within_toler_dirs.empty()) {
+      int min_diff = std::numeric_limits<int>::max();
+      for (int chop_dir=0; chop_dir<AMREX_SPACEDIM; ++chop_dir) {
+        int diff = std::abs(np_cutoff_bydir[chop_dir] - np_target);
+        if (diff < min_diff) {
+          min_diff     = diff;
+          min_chop_dir = chop_dir;
+        }
+      }
+    }
+    // choose the one with least surface particles
+    else {
+      int min_np_surface = std::numeric_limits<int>::max();
+      for (int dir: within_toler_dirs) {
+        if (np_surface_bydir[dir] < min_np_surface) {
+          min_np_surface = np_surface_bydir[dir];
+          min_chop_dir   = dir;
+        }
+      }
+    }
+
+    // chop the cutoff chunk
+    Box new_box = remain.chop(min_chop_dir, chop_pos_bydir[min_chop_dir]);
+    fbl_vec[o_box_id] = remain;
+    
+    //now update np_mf_f
+    //np_mf_f.define(, ParticleDistributionMap(lev), 1, 0);
+    //countParticle(lev, np_mf_f); 
+
+    //fbl_vec.push_back(new_box); 
+    new_box_np = np_cutoff_bydir[min_chop_dir]; 
+
+    return new_box;
+}
+//ACJ
+
+//ACJ
+void get_over_under_load_ranks(Vector<int>& underload_ranks, Vector<int>& overload_ranks, const Vector<int>& pcount_rank, 
+        Vector<BidNp>& o_q, Vector<BidNp>& u_q, const int& o_toler_np, const int& u_toler_np)
+{
+   underload_ranks.clear();
+   overload_ranks.clear();
+    for (auto i=0; i<pcount_rank.size(); ++i){
+        if (pcount_rank[i] < u_toler_np)  
+            underload_ranks.push_back(i);
+        else if (pcount_rank[i] > o_toler_np) 
+            overload_ranks.push_back(i);
+    }
+    
+    o_q.clear();
+    u_q.clear();
+    // construct queues for over and under loaded ranks
+    for (int rank: overload_ranks)
+        o_q.push_back(std::make_pair(rank, pcount_rank[rank]));
+    for (int rank: underload_ranks)
+        u_q.push_back(std::make_pair(rank, pcount_rank[rank]));
+    
+    std::sort(o_q.begin(), o_q.end(), PairCompare(true)); //descending order
+    std::sort(u_q.begin(), u_q.end(), PairCompare(false)); //ascending order
+
+    return;
+}
+//ACJ
+
+//Simple function testing whether the calling rank is BOTH an overload rank AND has an available underload rank to 
+//unload into. If both aren't true wait to execute.
+bool should_execute(const Vector<BidNp> & o_q, const Vector<BidNp>& u_q, int& o_rank, int& o_rank_np, int& u_rank, int& u_rank_np)
+{
+    bool should_exec = false;
+    int myproc = ParallelDescriptor::MyProc();
+    for( int idx = 0; idx < std::min(o_q.size(), u_q.size()); ++idx){
+        if (myproc == o_q[idx].first){ //each overload rank uses underload rank at same index
+            o_rank = o_q[idx].first;
+            o_rank_np = o_q[idx].second;
+            u_rank = u_q[idx].first;
+            u_rank_np = u_q[idx].second;
+            should_exec = true;
+            break;
+        }
+    }
+    return should_exec;
+}
+
+//ACJconst amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap
+void 
+DarkMatterParticleContainer::load_balance(int lev, amrex::Real overload_toler, amrex::Real underload_toler)
+{
+  
+    // parent grid info
+    const amrex::BoxArray& fba = ParticleBoxArray(lev);
+    const amrex::DistributionMapping& fdmap = ParticleDistributionMap(lev);
+    const Vector<int>& fpmap    = fdmap.ProcessorMap();
+    BoxList            fbl      = fba.boxList();
+    Vector<Box>&       fbl_vec  = fbl.data();
+    Vector<Box>        fbl_vec0 = fbl_vec;
+
+    // If the mapping between particle and parent grids hasn't been set,
+    // set an 1to1 mapping.
+    if (m_pboxid_to_fboxid.size() == 0) {
+        m_pboxid_to_fboxid.resize(fbl.size());
+        std::iota(m_pboxid_to_fboxid.begin(), m_pboxid_to_fboxid.end(), 0);
+    }
+
+    // count particles in parent grid
+    Vector<int> pcount_fbox(fba.size(), 0);
+    for (MyParIter pti(*this, lev); pti.isValid(); ++pti) {
+        int fboxid = m_pboxid_to_fboxid[pti.index()];
+        pcount_fbox[fboxid] += pti.numParticles();
+    }
+    ParallelDescriptor::ReduceIntSum(pcount_fbox.dataPtr(), pcount_fbox.size());
+
+    // count particles by rank
+    Vector<int> pcount_rank(ParallelDescriptor::NProcs(), 0), pcount_rank_diff(ParallelDescriptor::NProcs(),0);
+    std::unordered_map<int,  std::list<BidNp>> rank_box_map;
+    for (auto i=0; i<pcount_fbox.size(); ++i) {
+        pcount_rank[fpmap[i]] += pcount_fbox[i];
+        rank_box_map[fpmap[i]].push_back(BidNp(i, pcount_fbox[i]));
+    }
+
+    // count total # particles
+    if (m_total_numparticle <= 0) {
+        m_total_numparticle = 0;
+        for (MyParIter pti(*this, lev); pti.isValid(); ++pti)
+            m_total_numparticle += static_cast<long>(pti.numRealParticles());
+        ParallelDescriptor::ReduceLongSum(m_total_numparticle);
+    }
+
+    // find the underload and overload tolerances
+    if (overload_toler<=1)
+        amrex::Abort("DarkMatterParticleContainer::load_balance(): overload_toler must be greater than 1");
+    Real avg_np = static_cast<Real>(m_total_numparticle) / ParallelDescriptor::NProcs();
+    int  o_toler_np = static_cast<int>(avg_np * overload_toler);
+    int  u_toler_np = static_cast<int>(avg_np); //make any rank below average a potential underloaded rank
+
+    // debug
+    Print() << "avg np: "              << avg_np
+          << " overload tolerance "  << overload_toler << "\n";
+
+    //now actually start the redivisioning algorithm
+    amrex::Print()<<"starting 3D load_balance algorithm..."<<std::flush;
+
+    // particle counts based on particle grids
+    iMultiFab np_mf_p(ParticleBoxArray(lev), ParticleDistributionMap(lev), 1, 0);
+    np_mf_p.setVal(0);
+    // particle counts based on fluid grids
+    iMultiFab np_mf_f(The_Pinned_Arena());
+    np_mf_f.define(fba, fdmap, 1, 0);
+    // count the particles and copy across grids
+    countParticle(lev, np_mf_p);                
+    np_mf_f.ParallelCopy(np_mf_p);
+
+      //ACJ
+      /*
+      if (o_q.size()>0)
+      {
+          volatile int gdb = 0;
+          char hostname[256];
+          gethostname(hostname, sizeof(hostname));
+          printf("rank %d PID %d on %s ready for attach\n", ParallelDescriptor::MyProc(), getpid(), hostname);
+          fflush(stdout);
+          if(ParallelDescriptor::MyProc()==0){
+              while (0 == gdb){
+                  usleep(1000);
+              }       
+          }
+          ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
+      }*/
+      //ACJ
+    //new box->processor map
+    Vector<int> new_ppmap(fpmap), ppmap_chngs(fpmap.size(), 0);    
+    int u_rank;
+    int o_rank;
+    int u_rank_np;
+    int o_rank_np;
+    Vector<Box> add_bl; //this will store the additional boxes that result from splitting
+    Vector<int> add_ppmap; //this will store additional dmap entries
+    Vector<int> add_m_pboxid_to_fboxid;
+    Vector<int> underload_ranks, overload_ranks;
+    Vector<BidNp> o_q, u_q;
+    //first get the under and over load ranks
+    get_over_under_load_ranks(underload_ranks, overload_ranks, pcount_rank, o_q, u_q, o_toler_np, u_toler_np);
+    //then find out if this rank is an overload rank (and has an underload rank to unload into) and execute 
+    //algorithm if both are true.
+    bool should_exec = should_execute(o_q, u_q, o_rank, o_rank_np, u_rank, u_rank_np); 
+    
+    while(should_exec)
+    {
+        //get the list of boxes for this overload rank
+        std::list<BidNp>& o_box_list = rank_box_map[o_rank];
+        o_box_list.sort(PairCompare(true));  //sort in descending order
+         
+        //TODO: could add more intelligence to matching over and underload ranks
+        //get number of particles this rank needs to remove
+        int num_2_rmv = o_rank_np - o_toler_np;
+        int room = avg_np - u_rank_np;
+        while(num_2_rmv>0  && room>0)
+        { 
+            //get the space available and num of apparticles we will attempt to remove
+            int num_do_rmv = std::min(room, num_2_rmv);
+            
+            //if possible, find box that eliminates overload and fits in underload rank
+            //TODO: could find multiple boxes that collectively do the necessary balancing
+            bool isbox = false;
+            int box_2_mv_id, box_2_mv_np;
+            for(auto it = o_box_list.begin(); it!=o_box_list.end(); ++it){
+                int np = it->second;
+                if(np >= num_do_rmv && np <= room){ 
+                    isbox = true;
+                    box_2_mv_id = it->first;
+                    box_2_mv_np = np;
+                    o_box_list.erase(it); //remove this box from list as it now belongs to u_rank
+                    break;
+                }   
+            }
+            if(isbox) //can simply send this box to underload rank and be done
+            {
+                ppmap_chngs[box_2_mv_id] = u_rank; //record changes to new_ppmap for later broadcasting
+                num_2_rmv -= box_2_mv_np; //num_do_rmv;
+                u_rank_np += box_2_mv_np;
+                pcount_rank_diff[o_rank] -= box_2_mv_np;
+                pcount_rank_diff[u_rank] += box_2_mv_np;
+            }
+            else //need to split
+            {
+                //split the biggest box 
+                //TODO: make better method for choosing box to split
+                int o_box_id = o_box_list.front().first;
+          
+                //split the box and send chunk to u_rank 
+                //note: below function does necessary updates to fbl_vec
+                int new_box_np;
+                Box new_box = chop_and_distribute_box(o_box_id, num_do_rmv, fbl_vec0[o_box_id], fbl_vec, np_mf_f, new_box_np, lev); 
+                add_bl.push_back(new_box);
+
+                // update new dmap
+                add_ppmap.push_back(u_rank);
+                add_m_pboxid_to_fboxid.push_back(o_box_id);
+
+                //make necessary changes to overload box list
+                int o_box_np = o_box_list.front().second;
+                o_box_list.pop_front(); //remove old entry
+                BidNp o_pair(o_box_id, o_box_np-new_box_np);
+                //insert box into proper sorted position
+                int idx = 0;
+                for (auto it = o_box_list.begin(); it!=o_box_list.end(); ++it){
+                    if(o_box_np >= it->second) {
+                        o_box_list.insert(it, o_pair); 
+                        break;
+                    }
+                    idx++;                    
+                }
+                if(idx==o_box_list.size()) o_box_list.push_back(o_pair); 
+                
+                //update number of particles left to remove
+                num_2_rmv -= new_box_np;
+                u_rank_np += new_box_np;
+                pcount_rank_diff[o_rank] -= new_box_np;
+                pcount_rank_diff[u_rank] += new_box_np;
+            }
+            
+            //update count of room available in this underload rank
+            room = avg_np - u_rank_np;
+
+        }  //end while
+        
+        //////re-assess which ranks are the under and overload ranks////
+        //
+        //need to synchronize changes in pcount_rank across processes
+        ParallelDescriptor::ReduceIntSum(pcount_rank_diff.dataPtr(), pcount_rank_diff.size());
+        //now add up differences in pcount_rank
+        for(int i=0; i<pcount_rank.size(); pcount_rank.size()){
+            pcount_rank[i] += pcount_rank_diff[i];
+            pcount_rank_diff[i] = 0; //reset pcount_rank_diff
+        }
+        //now re-assess what the under and overload ranks are
+        //this function also does the necessary updates to input vectors 
+        get_over_under_load_ranks(underload_ranks, overload_ranks, pcount_rank, 
+                o_q, u_q, o_toler_np, u_toler_np); 
+        
+        //then need to see if this rank should execute and keep executing if so. 
+        //This function also does necessary updating to: o_rank, o_rank_np, u_rank and u_rank_np
+        should_exec = should_execute(o_q, u_q, o_rank, o_rank_np, u_rank, u_rank_np); 
+        
+    }// end while 
+    
+    //everyone needs to synchronize their changes to new_ppmap
+    ParallelDescriptor::ReduceIntMax(ppmap_chngs.dataPtr(), ppmap_chngs.size());
+    for(int i=0 ; i<ppmap_chngs.size(); ++i)
+       if(ppmap_chngs[i]) new_ppmap[i] = ppmap_chngs[i];
+
+    //write number of new boxes into one vector so every rank knows how to form global list
+    //
+    int myproc = ParallelDescriptor::MyProc(), nprocs= ParallelDescriptor::NProcs();
+    Vector<int> new_bxs_per_rank(nprocs, 0);
+    new_bxs_per_rank[myproc] = add_bl.size();
+    ParallelDescriptor::ReduceIntMax(new_bxs_per_rank.dataPtr(), nprocs);
+    
+    //resize fbl_vec and new_ppmap to be able to contain additional entries
+    int num_new = std::accumulate(new_bxs_per_rank.begin(), new_bxs_per_rank.end(), 0);
+    for(int i=0; i<num_new; ++i){
+        fbl_vec.push_back(Box(IntVect{std::numeric_limits<int>::min()},
+                            IntVect{std::numeric_limits<int>::max()}));
+        new_ppmap.push_back(-1);
+    } 
+
+    //now add new entries (for this rank), in appropriate position.
+    //(Will sync with other ranks later)
+    //
+    int write_pos = std::accumulate(new_bxs_per_rank.begin(), new_bxs_per_rank.begin()+myproc, 0);
+    for(int i=0; i<add_bl.size(); ++i){
+        fbl_vec[write_pos+i] = add_bl[i];
+        new_ppmap[write_pos+i] = add_ppmap[i];
+    }
+
+    //sync the dmaps
+    ParallelDescriptor::ReduceIntMax(&new_ppmap[new_ppmap.size()-1]-num_new+1, num_new);
+
+    //sync the boxes
+    size_t nbox = fbl_vec.size();
+    Vector<int> ubound_buf(3*nbox);
+    Vector<int> lbound_buf(3*nbox);
+    // pack the buffer
+    for (size_t i=0; i<nbox; ++i) {
+      ubound_buf[3*i]   = fbl_vec[i].bigEnd(0);
+      ubound_buf[3*i+1] = fbl_vec[i].bigEnd(1);
+      ubound_buf[3*i+2] = fbl_vec[i].bigEnd(2);
+      lbound_buf[3*i]   = fbl_vec[i].smallEnd(0);
+      lbound_buf[3*i+1] = fbl_vec[i].smallEnd(1);
+      lbound_buf[3*i+2] = fbl_vec[i].smallEnd(2);
+    }
+
+    ParallelDescriptor::ReduceIntMin(ubound_buf.dataPtr(), 3*nbox);
+    ParallelDescriptor::ReduceIntMax(lbound_buf.dataPtr(), 3*nbox);
+   
+    // unpack the buffer
+    for (size_t i=0; i<nbox; ++i) {
+      fbl_vec[i] =
+        Box(IntVect{lbound_buf[3*i], lbound_buf[3*i+1], lbound_buf[3*i+2]},
+            IntVect{ubound_buf[3*i], ubound_buf[3*i+1], ubound_buf[3*i+2]});
+    }
+    amrex::Print()<<"done."<<std::endl;
+
+    // ba and dmap to particle container
+    SetParticleBoxArray(lev, BoxArray(fbl));
+    SetParticleDistributionMap(lev, DistributionMapping(new_ppmap)); 
+}
+//ACJ
 
 //ACJ
 void
@@ -434,7 +885,7 @@ DarkMatterParticleContainer::partitionParticleGrids(int lev, const amrex::BoxArr
         //AllPrintToFile("debug") << "current remain " << remain << "\n";
         int np_target    = np_cutoff[kv.first][icutoff];
         int np_target_lo = static_cast<int>(np_target * underload_toler);
-        int np_target_hi = static_cast<int>(np_target *  overload_toler);
+        int np_target_hi = static_cast<int>(np_target * overload_toler);
         int min_chop_dir = -1;
 
         Vector<int> np_cutoff_bydir (AMREX_SPACEDIM);
