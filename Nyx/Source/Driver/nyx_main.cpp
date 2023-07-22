@@ -201,7 +201,7 @@ nyx_main (int argc, char* argv[])
             }
 
             //ACJ
-            if(ParallelDescriptor::IOProcessor() && (amrptr->levelSteps(0)%(4*loadBalanceInt) == 0) && (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
+            if(ParallelDescriptor::IOProcessor() && (amrptr->levelSteps(0)%loadBalanceInt == 0) && (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
             {
                 std::cout<<"writing rank_loads, load_balance_int: "<<loadBalanceInt<<", load_balance_start_z: "<<loadBalanceStartZ<<std::endl;
                 write_rank_loads(Nyx::dual_grid, rank_loads);

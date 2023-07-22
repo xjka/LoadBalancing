@@ -1823,7 +1823,7 @@ Nyx::postCoarseTimeStep (Real cumtime)
               theDMPC()->Redistribute(); //to make sure particles are over the proper grids
               //theDMPC()->partitionParticleGrids(lev, parent->boxArray(lev), parent->DistributionMap(lev),
                                          //overload_toler, underload_toler); //the box array and distribution map are supposed to be those of the fluid
-              theDMPC()->load_balance(lev, overload_toler, underload_toler);
+              theDMPC()->load_balance(lev, parent->boxArray(lev), parent->DistributionMap(lev), overload_toler, underload_toler);
               dm = theDMPC()->ParticleDistributionMap(lev);
         
             }
