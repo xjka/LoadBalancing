@@ -256,7 +256,6 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
             np_slice += *(np_ptr + iCell);
           }
         }
-        
         int np_diff = std::abs(np_target - np_tmp - np_slice);
         if ((np_diff > np_diff_prev && chop_hi - chop_pos + 1 >= greedy_min_grid_size)  ||
                 np_tmp+np_slice>room ) 
@@ -592,7 +591,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                     }
                     else //couldn't create new_box that meets criteria, just remove box from list
                     //TODO: make better attempt to split box in chop_and_distribute_box() above.
-                    //(Though this technique of just pretending unsplittable box doesn't eist has benefit
+                    //(Though this technique of just pretending unsplittable box doesn't exist has benefit
                     //of being faster and tending to create less boxes.)
                     {
                         num_2_rmv -= o_box_list.front().second;
