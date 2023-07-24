@@ -243,7 +243,6 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
 
       int np_tmp       = 0;
       int np_diff_prev = np_target + 1;
-
       // find the chop position with the closest np to np_target
       while (chop_pos >= chop_lo) {
         int np_slice = 0;
@@ -257,27 +256,29 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
           }
         }
         int np_diff = std::abs(np_target - np_tmp - np_slice);
-        if ((np_diff > np_diff_prev && chop_hi - chop_pos + 1 >= greedy_min_grid_size)  ||
-                np_tmp+np_slice>room ) 
-        //if(np_diff > np_diff_prev || np_tmp+np_slice>room)
+        if((np_diff>np_diff_prev && chop_hi-chop_pos+1>=greedy_min_grid_size) 
+                || np_tmp+np_slice>room)
         {
-          ++chop_pos;
-          break;
+            ++chop_pos;
+            break;
         }
-        else {
-          np_diff_prev = np_diff;
-          np_tmp      += np_slice;
-          --chop_pos;
+        else
+        {
+            np_diff_prev = np_diff;
+            np_tmp += np_slice;
+            --chop_pos;
         }
       }// end while
       chop_pos = chop_pos == chop_lo-1 ? chop_lo : chop_pos;
-      chop_pos = chop_pos > chop_hi ? chop_hi : chop_pos;
+      chop_pos = chop_pos > chop_hi ? chop_hi : chop_pos; 
       np_cutoff_bydir[chop_dir] = np_tmp;
       chop_pos_bydir [chop_dir] = chop_pos;
-
+      
       // count surface particles
       Box remain_copy(remain);
-      Box cutoff (remain_copy.chop(chop_dir, chop_pos));
+      Box cutoff(remain_copy.chop(chop_dir, chop_pos));
+          
+      //Box cutoff (remain_copy.chop(chop_dir, chop_pos));
       int np_surface = 0;
       // z faces
       for (int j=cutoff.smallEnd(1); j<=cutoff.bigEnd(1); ++j) {
@@ -328,7 +329,7 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
       for (int dir: within_toler_dirs) {
         if (np_surface_bydir[dir] < min_np_surface) {
           min_np_surface = np_surface_bydir[dir];
-          min_chop_dir   = dir;
+          min_chop_dir = dir;
         }
       }
     }
@@ -528,32 +529,32 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                 //get the space available and num of apparticles we will attempt to remove
                 int num_do_rmv = std::min(room, num_2_rmv);
                 
-                //if possible, find box that eliminates overload and fits in underload rank
-                //TODO: could find multiple boxes that collectively do the necessary balancing
-                bool isbox = false;
-                int box_2_mv_id, box_2_mv_np;
-                for(auto it = o_box_list.begin(); it!=o_box_list.end(); ++it){
-                    int np = it->second;
-                    if(np >= num_do_rmv && np <= room){ 
-                        isbox = true;
-                        box_2_mv_id = it->first;
-                        box_2_mv_np = np;
-                        o_box_list.erase(it); //remove this box from list as it now belongs to u_rank
-                        break;
-                    }   
-                }
-                if(isbox) //can simply send this box to underload rank and be done
+                //Reduce load as much as possible by simply sending as many boxes as possible to underload rank
+                auto it = o_box_list.begin();
+                while(num_do_rmv>0 && it!=o_box_list.end())
                 {
-                    ppmap_chngs[box_2_mv_id] = u_rank; //record changes to new_ppmap for later broadcasting
-                    num_2_rmv -= box_2_mv_np; //num_do_rmv;
-                    u_rank_np += box_2_mv_np;
-                    pcount_rank_diff[o_rank] -= box_2_mv_np;
-                    pcount_rank_diff[u_rank] += box_2_mv_np;
+                    int box_2_mv_id = it->first;
+                    int box_2_mv_np = it->second;
+                    if(box_2_mv_np<=room)
+                    {
+                        ppmap_chngs[box_2_mv_id] = u_rank;
+                        num_2_rmv -= box_2_mv_np;
+                        num_do_rmv -= box_2_mv_np;
+                        u_rank_np += box_2_mv_np;
+                        room = avg_np - u_rank_np;
+                        pcount_rank_diff[o_rank] -= box_2_mv_np;
+                        pcount_rank_diff[u_rank] += box_2_mv_np;
+                        auto it_tmp = it;
+                        it++;
+                        o_box_list.erase(it_tmp);
+                    }
+                    else
+                        it++;
                 }
-                else //need to split
+               
+                if(num_do_rmv>0) //need to split
                 {
-                    //split the biggest box 
-                    //TODO: make better method for choosing box to split
+                    //choose the biggest box 
                     int o_box_id = o_box_list.front().first;
               
                     //split the box and send chunk to u_rank 
@@ -707,22 +708,6 @@ void
 DarkMatterParticleContainer::partitionParticleGrids(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, 
                                                      amrex::Real underload_toler)
 {
-
-  //ACJ
-  {
-      volatile int gdb = 0;
-      char hostname[256];
-      gethostname(hostname, sizeof(hostname));
-      printf("rank %d PID %d on %s ready for attach\n", ParallelDescriptor::MyProc(), getpid(), hostname);
-      fflush(stdout);
-      if(ParallelDescriptor::MyProc()==0){
-          while (0 == gdb){
-              usleep(1000);
-          }       
-      }
-      ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
-  }
-  //ACJ
    
   // fluid grid info
   const Vector<int>& fpmap    = fdmap.ProcessorMap();
