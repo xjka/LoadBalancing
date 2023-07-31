@@ -51,11 +51,11 @@ const int quitSignal(-44);
 amrex::LevelBld* getLevelBld ();
 
 //ACJ
-void write_rank_loads(const bool & dual_grid, const std::vector<amrex::Vector<long>> & rank_loads)
+void write_rank_loads(const bool & dual_grid_load_balance, const std::vector<amrex::Vector<long>> & rank_loads)
 {
     //write the rank loads over times  
     std::string rankloadfile;
-    if(dual_grid)
+    if(dual_grid_load_balance)
         rankloadfile = "rank_loads_dual_grid";
     else
         rankloadfile = "rank_loads";
@@ -204,7 +204,7 @@ nyx_main (int argc, char* argv[])
             if(ParallelDescriptor::IOProcessor() && (amrptr->levelSteps(0)%loadBalanceInt == 0) && (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
             {
                 std::cout<<"writing rank_loads, load_balance_int: "<<loadBalanceInt<<", load_balance_start_z: "<<loadBalanceStartZ<<std::endl;
-                write_rank_loads(Nyx::dual_grid, rank_loads);
+                write_rank_loads(Nyx::dual_grid_load_balance, rank_loads);
             }
             //ACJ
 
@@ -213,7 +213,7 @@ nyx_main (int argc, char* argv[])
 
     //ACJ
     if (ParallelDescriptor::IOProcessor())
-        write_rank_loads(Nyx::dual_grid, rank_loads); 
+        write_rank_loads(Nyx::dual_grid_load_balance, rank_loads); 
     //ACJ
 
     const Real time_without_init = ParallelDescriptor::second() - time_before_main_loop;

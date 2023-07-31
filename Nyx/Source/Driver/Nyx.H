@@ -815,7 +815,7 @@ int integrate_state_struct
     static int particle_max_grid_size_y;   //ACJ
     static int particle_max_grid_size_z;    //ACJ
     
-    static bool dual_grid;              //ACJ
+    static bool dual_grid_load_balance;  //ACJ
     static amrex::Real overload_toler;  //ACJ
     static amrex::Real underload_toler; //ACJ  
 

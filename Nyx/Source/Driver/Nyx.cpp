@@ -92,7 +92,7 @@ int Nyx::load_balance_wgt_strategy = 0;
 int Nyx::load_balance_wgt_nmax = -1;
 int Nyx::load_balance_strategy = DistributionMapping::SFC;
 
-bool Nyx::dual_grid = false; //ACJ
+bool Nyx::dual_grid_load_balance = false; //ACJ
 Real Nyx::overload_toler = 1.2; //ACJ
 Real Nyx::underload_toler = 0.8; //ACJ
 
@@ -438,7 +438,7 @@ Nyx::read_params ()
     load_balance_wgt_nmax = amrex::ParallelDescriptor::NProcs();
     pp_nyx.query("load_balance_wgt_nmax",     load_balance_wgt_nmax);
 
-    pp_nyx.query("dual_grid", dual_grid); //ACJ
+    pp_nyx.query("dual_grid_load_balance", dual_grid_load_balance); //ACJ
     pp_nyx.query("overload_toler", overload_toler); //ACJ
     pp_nyx.query("underload_toler", underload_toler); //ACJ
 
@@ -1055,6 +1055,23 @@ Nyx::computeNewDt (int                      finest_level,
                    Real                     stop_time,
                    int                      post_regrid_flag)
 {
+
+    //ACJ
+/*{
+    volatile int gdb = 0;
+    char hostname[256];
+    gethostname(hostname, sizeof(hostname));
+    printf("rank %d PID %d on %s ready for attach\n", ParallelDescriptor::MyProc(), getpid(), hostname);
+    fflush(stdout);
+    if(ParallelDescriptor::MyProc()==0){
+        while (0 == gdb){
+            usleep(1000);
+        }
+    }
+    ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
+}*/
+//ACJ
+//
     BL_PROFILE("Nyx::computeNewDt()");
     //
     // We are at the start of a coarse grid timecycle.
@@ -1816,7 +1833,7 @@ Nyx::postCoarseTimeStep (Real cumtime)
             DistributionMapping dm;
 
             //ACJ
-            if(dual_grid)
+            if(dual_grid_load_balance)
             {
               //Currently implements the Mfix greedy strategy.
               //Accept fact that this is done only for DMPC for now (instead of also including AGN, etc.)
@@ -1876,7 +1893,7 @@ Nyx::postCoarseTimeStep (Real cumtime)
 
             //ACJ
             amrex::BoxArray new_ba;
-            if(dual_grid)
+            if(dual_grid_load_balance)
                 new_ba = theDMPC()->ParticleBoxArray(lev);
             else
                 new_ba = parent->boxArray(lev);

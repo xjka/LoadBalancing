@@ -243,6 +243,7 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
 
       int np_tmp       = 0;
       int np_diff_prev = np_target + 1;
+     
       // find the chop position with the closest np to np_target
       while (chop_pos >= chop_lo) {
         int np_slice = 0;
@@ -256,11 +257,16 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
           }
         }
         int np_diff = std::abs(np_target - np_tmp - np_slice);
-        if((np_diff>np_diff_prev && chop_hi-chop_pos+1>=greedy_min_grid_size) 
-                || np_tmp+np_slice>room)
+        if((np_diff>np_diff_prev || np_tmp+np_slice>room) && chop_hi-chop_pos+1>=greedy_min_grid_size)
         {
             ++chop_pos;
             break;
+        }
+        else if(np_tmp+np_slice>room && chop_hi-chop_pos+1<greedy_min_grid_size)
+        {
+            Box dummy;
+            new_box_np = -1;
+            return dummy;
         }
         else
         {
@@ -405,7 +411,8 @@ bool should_execute(const Vector<BidNp> & o_q, const Vector<BidNp>& u_q, int& o_
 void 
 DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, amrex::Real underload_toler)
 {
-  
+    
+     BL_PROFILE("DarkMatterParticleContainer::load_balance()"); 
     // parent grid info
     //const amrex::BoxArray& fba = ParticleBoxArray(lev);
     //const amrex::DistributionMapping& fdmap = ParticleDistributionMap(lev);
@@ -494,20 +501,6 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     MPI_Comm_group(world_comm_dup, &world_group);
     int overload_tag = 0;
       
-    /*{
-          volatile int gdb = 0;
-          char hostname[256];
-          gethostname(hostname, sizeof(hostname));
-          printf("rank %d PID %d on %s ready for attach\n", MyProc, getpid(), hostname);
-          fflush(stdout);
-          if(ParallelDescriptor::MyProc()==0){
-              while (0 == gdb){
-                  usleep(1000);
-              }       
-          }
-          ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
-      }*/
-
     while(am_overload_rank)
     { 
         //create appropriate comunicator from group
@@ -700,6 +693,14 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     // ba and dmap to particle container
     SetParticleBoxArray(lev, BoxArray(fbl));
     SetParticleDistributionMap(lev, DistributionMapping(new_ppmap)); 
+
+    std::cout<<MyProc<<"|fbl_vec.size()="<<ParticleBoxArray(lev).boxList().data().size()<<", new_ppmap.size()="<<ParticleDistributionMap(lev).ProcessorMap().size()<<std::endl;
+    for(int i=0; i<fbl.data().size(); i++){
+        auto b = ParticleBoxArray(lev).boxList().data()[i];
+        int own_proc = ParticleDistributionMap(lev).ProcessorMap()[i];
+        std::cout<<MyProc<<"| proc:"<<own_proc<<", "<<"Lo:["<<b.smallEnd(0)<<","<<b.smallEnd(1)<<","<<b.smallEnd(2)<<"], Hi:["<<b.bigEnd(0)<<","<<b.bigEnd(1)<<","<<b.bigEnd(2)<<"]"<<std::endl;
+    }
+   
 }
 //ACJ
 

@@ -1,7 +1,7 @@
 nyx.load_balance_int = 3
 nyx.load_balance_start_z = 199
   
-nyx.dual_grid = 1
+nyx.dual_grid_load_balance = 1
 nyx.overload_toler = 1.2
 nyx.underload_toler = 0.8
   

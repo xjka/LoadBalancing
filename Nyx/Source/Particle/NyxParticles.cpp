@@ -510,7 +510,7 @@ Nyx::init_particles ()
         //DistributionMapping pdm; //ACJ
         //Vector<int>         pboxmap;  // ACJ| map each particle box to its parent fluid box
 
-        //if (!Nyx::dual_grid) { //ACJ
+        //if (!Nyx::dual_grid_load_balance) { //ACJ
         //  pbl = parent->boxArray(0).boxList(); //ACJ
         //  pba = parent->boxArray(0);           //ACJ
         //  pdm = parent->DistributionMap(0);   //ACJ
@@ -519,7 +519,7 @@ Nyx::init_particles ()
         //}
        /* 
         else//ACJ 
-        { // dual_grid is enabled
+        { // dual_grid_load_balance is enabled
 
             ////////////////////////////////////////////////////////////////////////////////
             ParmParse pp("particles");
@@ -606,14 +606,14 @@ Nyx::init_particles ()
 
             if (!pboxmap.empty())
                 DMPC->setParticleFluidGridMap(pboxmap);
-        }  //end dual_grid else  
+        }  //end dual_grid_load_balance else  
         //ACJ
         */
 
         ActiveParticles.push_back(DMPC); 
 
         if (init_with_sph_particles == 1){
-            //if(dual_grid)                                                            //ACJ
+            //if(dual_grid_load_balance)                                               //ACJ
             //    SPHPC = new DarkMatterParticleContainer(parent->Geom(0), pdm, pba);  //ACJ
             //else                                                                     //ACJ
                 SPHPC = new DarkMatterParticleContainer(parent);
@@ -621,13 +621,13 @@ Nyx::init_particles ()
 
         if (parent->subCycle())
         {
-            //if(dual_grid)                                                             //ACJ
+            //if(dual_grid_load_balance)                                                //ACJ
             //    VirtPC = new DarkMatterParticleContainer(parent->Geom(0), pdm, pba);  //ACJ
             //else                                                                      //ACJ
                 VirtPC = new DarkMatterParticleContainer(parent);
             VirtualParticles.push_back(VirtPC); 
             
-            //if(dual_grid)                                                             //ACJ
+            //if(dual_grid_load_balance)                                                //ACJ
             //    GhostPC = new DarkMatterParticleContainer(parent->Geom(0), pdm, pba); //ACJ
             //else                                                                      //ACJ
                 GhostPC = new DarkMatterParticleContainer(parent);
@@ -1083,7 +1083,7 @@ Nyx::init_santa_barbara (int init_sb_vels)
         BL_PROFILE_VAR_STOP(CA_init);
 
         // Add the particle density to the gas density 
-        if(dual_grid)                                                        //ACJ
+        if(dual_grid_load_balance)                                             //ACJ
             S_new.ParallelAdd(*particle_mf[level], 0, Density_comp, 1, 1, 1);  //ACJ - the last two arguments (src_nghosts & dst_nghosts) being equal should be equivalent to single nghosts argument for Add()
         else                                                                 //ACJ
             MultiFab::Add(S_new, *particle_mf[level], 0, Density_comp, 1, 1);
@@ -1096,7 +1096,7 @@ Nyx::init_santa_barbara (int init_sb_vels)
             }
 
             // Add the particle momenta to the gas momenta (initially zero)
-            if(dual_grid)                                                                              //ACJ
+            if(dual_grid_load_balance)                                                         //ACJ
                 S_new.ParallelAdd(*particle_mf[level], 1, Xmom_comp, AMREX_SPACEDIM, S_new.nGrow(), S_new.nGrow());  //ACJ the last two agrguments (src_nghosts & dst_nghosts) being equal should be equivalent to below
             else                                                                                       //ACJ
                 MultiFab::Add(S_new, *particle_mf[level], 1, Xmom_comp, AMREX_SPACEDIM, S_new.nGrow());

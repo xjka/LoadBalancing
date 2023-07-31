@@ -338,7 +338,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
                                                     amrex::Real            cfl) const
 {
     BL_PROFILE("NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep(lev)");
-    amrex::Real            dt               = 1e50;
+    amrex::Real dt = 1e50;
     BL_ASSERT(NSR >= AMREX_SPACEDIM+1);
     BL_ASSERT(lev >= 0);
 
