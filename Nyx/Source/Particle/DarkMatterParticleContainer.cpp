@@ -359,12 +359,25 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
 void get_over_under_load_ranks(Vector<int>& underload_ranks, Vector<int>& overload_ranks, const Vector<int>& pcount_rank, 
         Vector<BidNp>& o_q, Vector<BidNp>& u_q, const int& o_toler_np, const int& u_toler_np)
 {
-   underload_ranks.clear();
-   overload_ranks.clear();
-    for (auto i=0; i<pcount_rank.size(); ++i){
-        if (pcount_rank[i] < u_toler_np)  
-            underload_ranks.push_back(i);
-        else if (pcount_rank[i] > o_toler_np) 
+    //do underload ranks
+    if(underload_ranks.size()>0){
+        Vector<int> tmp_underload_ranks;
+        for(int u_rnk : underload_ranks){
+            if(pcount_rank[u_rnk] < u_toler_np)
+                tmp_underload_ranks.push_back(u_rnk);
+        }
+        underload_ranks = tmp_underload_ranks;
+    }
+    else{
+        for(int i=0; i<pcount_rank.size(); ++i){
+            if(pcount_rank[i] < u_toler_np)
+                underload_ranks.push_back(i);
+        }
+    }
+    //do overload ranks
+    overload_ranks.clear();
+    for (int i=0; i<pcount_rank.size(); ++i){
+        if (pcount_rank[i] > o_toler_np) 
             overload_ranks.push_back(i);
     }
     
@@ -411,8 +424,7 @@ bool should_execute(const Vector<BidNp> & o_q, const Vector<BidNp>& u_q, int& o_
 void 
 DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, amrex::Real underload_toler)
 {
-    
-     BL_PROFILE("DarkMatterParticleContainer::load_balance()"); 
+    BL_PROFILE("DarkMatterParticleContainer::load_balance()"); 
     // parent grid info
     //const amrex::BoxArray& fba = ParticleBoxArray(lev);
     //const amrex::DistributionMapping& fdmap = ParticleDistributionMap(lev);
@@ -500,7 +512,24 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     MPI_Comm_dup(ParallelDescriptor::Communicator(), &world_comm_dup);
     MPI_Comm_group(world_comm_dup, &world_group);
     int overload_tag = 0;
-      
+ 
+
+//ACJ
+/*{
+    volatile int gdb = 0;
+    char hostname[256];
+    gethostname(hostname, sizeof(hostname));
+    printf("rank %d PID %d on %s ready for attach\n", amrex::ParallelDescriptor::MyProc(), getpid(), hostname);
+    fflush(stdout);
+    if(amrex::ParallelDescriptor::MyProc()==0){
+        while (0 == gdb){
+            usleep(1000);
+        }
+    }
+    amrex::ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
+}*/
+//ACJ     
+
     while(am_overload_rank)
     { 
         //create appropriate comunicator from group
@@ -519,7 +548,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
             int room = avg_np - u_rank_np;
             while(num_2_rmv>0  && room>0)
             { 
-                //get the space available and num of apparticles we will attempt to remove
+                //get the space available and num of particles we will attempt to remove
                 int num_do_rmv = std::min(room, num_2_rmv);
                 
                 //Reduce load as much as possible by simply sending as many boxes as possible to underload rank
@@ -530,16 +559,15 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                     int box_2_mv_np = it->second;
                     if(box_2_mv_np<=room)
                     {
-                        ppmap_chngs[box_2_mv_id] = u_rank;
+                        ppmap_chngs[box_2_mv_id] = u_rank+1; //add 1 so that rank 0 is non-zero, will subtract 1 later
                         num_2_rmv -= box_2_mv_np;
                         num_do_rmv -= box_2_mv_np;
                         u_rank_np += box_2_mv_np;
                         room = avg_np - u_rank_np;
                         pcount_rank_diff[o_rank] -= box_2_mv_np;
                         pcount_rank_diff[u_rank] += box_2_mv_np;
-                        auto it_tmp = it;
                         it++;
-                        o_box_list.erase(it_tmp);
+                        o_box_list.erase(std::prev(it));
                     }
                     else
                         it++;
@@ -553,6 +581,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                     //split the box and send chunk to u_rank 
                     //note: below function does necessary updates to fbl_vec
                     int new_box_np;
+                    //TODO: better splitting below
                     Box new_box = chop_and_distribute_box(o_box_id, num_do_rmv, fbl_vec0, fbl_vec, np_mf_f, new_box_np, room); 
                     if(new_box_np>=0)
                     {
@@ -584,13 +613,12 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                         pcount_rank_diff[u_rank] += new_box_np;
                     }
                     else //couldn't create new_box that meets criteria, just remove box from list
-                    //TODO: make better attempt to split box in chop_and_distribute_box() above.
-                    //(Though this technique of just pretending unsplittable box doesn't exist has benefit
-                    //of being faster and tending to create less boxes.)
+                    //TODO: consider this is unnecessary if limiting factor is small "room"s not highly dense cells
                     {
                         num_2_rmv -= o_box_list.front().second;
                         pcount_rank_diff[o_rank] -= o_box_list.front().second;
                         o_box_list.pop_front();
+                        break; //break to re-asses underload ranks in case this one is close to full
                     }
                 }
                 
@@ -603,9 +631,6 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         //////re-assess which ranks are the under and overload ranks////
         //
         //need to synchronize changes in pcount_rank across processes
-        //TODO: check if creating new group is more work than just 
-        //communicating between all processes every time 
-        //ParallelDescriptor::ReduceIntSum(pcount_rank_diff.dataPtr(), pcount_rank_diff.size());
         MPI_Allreduce(MPI_IN_PLACE, pcount_rank_diff.dataPtr(), pcount_rank_diff.size(), 
                 MPI_INT, MPI_SUM, overload_comm);
         //now add up differences in pcount_rank
@@ -630,9 +655,9 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
 
     //everyone needs to synchronize their changes to new_ppmap
     ParallelDescriptor::ReduceIntMax(ppmap_chngs.dataPtr(), ppmap_chngs.size());      
-    for(int i=0 ; i<ppmap_chngs.size(); ++i)
-       if(ppmap_chngs[i]) new_ppmap[i] = ppmap_chngs[i];
-
+    for(int i=0 ; i<ppmap_chngs.size(); ++i){
+       if(ppmap_chngs[i]) new_ppmap[i] = ppmap_chngs[i]-1; //-1 is just to convert flag to rank
+    }
     //write number of new boxes into one vector so every rank knows how to form global list
     Vector<int> new_bxs_per_rank(NProcs, 0);
     new_bxs_per_rank[MyProc] = addl_bl.size();
@@ -688,19 +713,19 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         Box(IntVect{lbound_buf[3*i], lbound_buf[3*i+1], lbound_buf[3*i+2]},
             IntVect{ubound_buf[3*i], ubound_buf[3*i+1], ubound_buf[3*i+2]});
     }
-    amrex::Print()<<"done."<<std::endl;
-    
+        
     // ba and dmap to particle container
     SetParticleBoxArray(lev, BoxArray(fbl));
     SetParticleDistributionMap(lev, DistributionMapping(new_ppmap)); 
+   
+    amrex::Print()<<"done."<<std::endl;
 
-    std::cout<<MyProc<<"|fbl_vec.size()="<<ParticleBoxArray(lev).boxList().data().size()<<", new_ppmap.size()="<<ParticleDistributionMap(lev).ProcessorMap().size()<<std::endl;
+    /*std::cout<<MyProc<<"|fbl_vec.size()="<<ParticleBoxArray(lev).boxList().data().size()<<", new_ppmap.size()="<<ParticleDistributionMap(lev).ProcessorMap().size()<<std::endl;
     for(int i=0; i<fbl.data().size(); i++){
         auto b = ParticleBoxArray(lev).boxList().data()[i];
         int own_proc = ParticleDistributionMap(lev).ProcessorMap()[i];
         std::cout<<MyProc<<"| proc:"<<own_proc<<", "<<"Lo:["<<b.smallEnd(0)<<","<<b.smallEnd(1)<<","<<b.smallEnd(2)<<"], Hi:["<<b.bigEnd(0)<<","<<b.bigEnd(1)<<","<<b.bigEnd(2)<<"]"<<std::endl;
-    }
-   
+    }*/
 }
 //ACJ
 

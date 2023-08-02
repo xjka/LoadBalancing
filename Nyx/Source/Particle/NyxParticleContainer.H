@@ -337,6 +337,23 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
                                                     int                    lev,
                                                     amrex::Real            cfl) const
 {
+
+//ACJ
+/*{
+    volatile int gdb = 0;
+    char hostname[256];
+    gethostname(hostname, sizeof(hostname));
+    printf("rank %d PID %d on %s ready for attach\n", amrex::ParallelDescriptor::MyProc(), getpid(), hostname);
+    fflush(stdout);
+    if(amrex::ParallelDescriptor::MyProc()==0){
+        while (0 == gdb){
+            usleep(1000);
+        }
+    }
+    amrex::ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
+}*/
+//ACJ
+    
     BL_PROFILE("NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep(lev)");
     amrex::Real dt = 1e50;
     BL_ASSERT(NSR >= AMREX_SPACEDIM+1);
