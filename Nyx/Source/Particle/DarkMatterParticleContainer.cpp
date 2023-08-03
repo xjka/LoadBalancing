@@ -266,6 +266,7 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
         {
             Box dummy;
             new_box_np = -1;
+            std::cout<<ParallelDescriptor::MyProc()<<"| room:"<<room<<", np_tmp+np_slice"<<np_tmp+np_slice<<", chop_hi: "<<chop_hi<<", chop_pos: "<<chop_pos<<std::endl;
             return dummy;
         }
         else
@@ -348,7 +349,7 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
         new_box_np = np_cutoff_bydir[min_chop_dir];
     }
     else
-        new_box_np = -1;
+        new_box_np = -2;
 
     fbl_vec[o_box_id] = remain;  
     return new_box;
@@ -529,7 +530,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     amrex::ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
 }*/
 //ACJ     
-
+    
     while(am_overload_rank)
     { 
         //create appropriate comunicator from group
@@ -615,9 +616,17 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                     else //couldn't create new_box that meets criteria, just remove box from list
                     //TODO: consider this is unnecessary if limiting factor is small "room"s not highly dense cells
                     {
-                        num_2_rmv -= o_box_list.front().second;
-                        pcount_rank_diff[o_rank] -= o_box_list.front().second;
-                        o_box_list.pop_front();
+                        //idea here is that if we did not add anything to the underload rank load
+                        //previously in this (outermost) loop, then the space available is as good as it's going to get
+                        //in the sense that if we recieve a new u_rank after re-assessing it can only have the same
+                        //or less space, and the space in this one won't change by running the loop again. So just need to 
+                        //drop this box. 
+                        if(pcount_rank_diff[u_rank]==0){
+                            std::cout<<MyProc<<"| removing box with np: "<<o_box_list.front().second<<", new_box_np code: "<<new_box_np<<std::endl; 
+                            num_2_rmv -= o_box_list.front().second;
+                            pcount_rank_diff[o_rank] -= o_box_list.front().second;
+                            o_box_list.pop_front();
+                        }
                         break; //break to re-asses underload ranks in case this one is close to full
                     }
                 }
