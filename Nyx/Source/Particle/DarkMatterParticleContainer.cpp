@@ -423,7 +423,8 @@ bool should_execute(const Vector<BidNp> & o_q, const Vector<BidNp>& u_q, int& o_
 
 //ACJconst amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap
 void 
-DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, amrex::Real underload_toler)
+DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, amrex::Real underload_toler, 
+        amrex::BoxArray &new_ba, amrex::DistributionMapping &new_dm)
 {
     BL_PROFILE("DarkMatterParticleContainer::load_balance()"); 
     // parent grid info
@@ -724,8 +725,8 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     }
         
     // ba and dmap to particle container
-    SetParticleBoxArray(lev, BoxArray(fbl));
-    SetParticleDistributionMap(lev, DistributionMapping(new_ppmap)); 
+    new_ba = BoxArray(fbl); //SetParticleBoxArray(lev, BoxArray(fbl));
+    new_dm = DistributionMapping(new_ppmap); //SetParticleDistributionMap(lev, DistributionMapping(new_ppmap)); 
    
     amrex::Print()<<"done."<<std::endl;
 

@@ -102,7 +102,8 @@ public:
     amrex::Vector<int> m_pboxid_to_fboxid; //ACJ
     void partitionParticleGrids(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, 
                                 amrex::Real underload_toler); //ACJ
-    void load_balance(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, amrex::Real underload_toler); 
+    void load_balance(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler, amrex::Real underload_toler,
+           amrex::BoxArray &new_ba, amrex::DistributionMapping &new_dm); 
     int  greedy_dir           = 0; //ACJ
     bool greedy_3d            = false; //ACJ
     int  greedy_min_grid_size = 1; //ACJ

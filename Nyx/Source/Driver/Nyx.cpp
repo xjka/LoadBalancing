@@ -978,8 +978,8 @@ Nyx::est_time_step (Real /*dt_old*/)
                   amrex::Real dt_gpu = 1.e37;
 #endif
 
-                  for         (int k = lo.z; k <= hi.z; ++k) {
-                    for     (int j = lo.y; j <= hi.y; ++j) {
+                  for (int k = lo.z; k <= hi.z; ++k) {
+                    for (int j = lo.y; j <= hi.y; ++j) {
                       for (int i = lo.x; i <= hi.x; ++i) {
                         if(u(i,j,k,Density_comp)<=1.1*local_small_dens && local_max_temp_dt==1)
                           continue;
@@ -1055,23 +1055,6 @@ Nyx::computeNewDt (int                      finest_level,
                    Real                     stop_time,
                    int                      post_regrid_flag)
 {
-
-    //ACJ
-/*{
-    volatile int gdb = 0;
-    char hostname[256];
-    gethostname(hostname, sizeof(hostname));
-    printf("rank %d PID %d on %s ready for attach\n", ParallelDescriptor::MyProc(), getpid(), hostname);
-    fflush(stdout);
-    if(ParallelDescriptor::MyProc()==0){
-        while (0 == gdb){
-            usleep(1000);
-        }
-    }
-    ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
-}*/
-//ACJ
-//
     BL_PROFILE("Nyx::computeNewDt()");
     //
     // We are at the start of a coarse grid timecycle.
@@ -1831,17 +1814,16 @@ Nyx::postCoarseTimeStep (Real cumtime)
             Nyx* cs = dynamic_cast<Nyx*>(&parent->getLevel(lev));
             Vector<long> wgts(parent->boxArray(lev).size());
             DistributionMapping dm;
-
+            BoxArray ba;
             //ACJ
             if(dual_grid_load_balance)
             {
-              //Currently implements the Mfix greedy strategy.
               //Accept fact that this is done only for DMPC for now (instead of also including AGN, etc.)
               theDMPC()->Redistribute(); //to make sure particles are over the proper grids
               //theDMPC()->partitionParticleGrids(lev, parent->boxArray(lev), parent->DistributionMap(lev),
                                          //overload_toler, underload_toler); //the box array and distribution map are supposed to be those of the fluid
-              theDMPC()->load_balance(lev, parent->boxArray(lev), parent->DistributionMap(lev), overload_toler, underload_toler);
-              dm = theDMPC()->ParticleDistributionMap(lev);
+              theDMPC()->load_balance(lev, parent->boxArray(lev), parent->DistributionMap(lev), overload_toler, underload_toler, ba, dm);
+              //dm = theDMPC()->ParticleDistributionMap(lev);
         
             }
             else
@@ -1894,7 +1876,7 @@ Nyx::postCoarseTimeStep (Real cumtime)
             //ACJ
             amrex::BoxArray new_ba;
             if(dual_grid_load_balance)
-                new_ba = theDMPC()->ParticleBoxArray(lev);
+                new_ba = ba; //theDMPC()->ParticleBoxArray(lev);
             else
                 new_ba = parent->boxArray(lev);
             //ACJ

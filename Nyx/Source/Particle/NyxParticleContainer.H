@@ -336,8 +336,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
                                                     amrex::Real            a,
                                                     int                    lev,
                                                     amrex::Real            cfl) const
-{
-
+{  
 //ACJ
 /*{
     volatile int gdb = 0;
@@ -353,7 +352,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
     amrex::ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
 }*/
 //ACJ
-    
+ 
     BL_PROFILE("NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep(lev)");
     amrex::Real dt = 1e50;
     BL_ASSERT(NSR >= AMREX_SPACEDIM+1);
@@ -363,7 +362,6 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
         return dt;
 
     const amrex::Real      strttime         = amrex::ParallelDescriptor::second();
-
     const amrex::Geometry& geom             = this->m_gdb->Geom(lev);
     const amrex::IntVect   base             = geom.Domain().smallEnd();
     const auto             dxi              = geom.InvCellSizeArray();
@@ -399,12 +397,12 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
       using ReduceTuple = typename decltype(reduce_data)::Type;
 
         for (MyConstParIter pti(*this, lev); pti.isValid(); ++pti) {
-            const int grid = pti.index();
-            const AoS&       pbox = pti.GetArrayOfStructs();
+            const int              grid = pti.index();
+            const AoS&             pbox = pti.GetArrayOfStructs();
             const ParticleType* pstruct = pbox().data();
-            const int        n    = pbox.size();
+            const int                 n = pbox.size();
 
-            const auto gfab = (ac_pointer) ? (*ac_pointer).array(grid) : acceleration.array(grid);
+            const auto gfab = (ac_pointer) ? (*ac_pointer).array(grid) : acceleration.array(grid); 
 
             num_particles_at_level += n;
 
@@ -414,13 +412,12 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
 
                 if (p.id() > 0)
                 {
-
                     amrex::IntVect cell;
                     cell[0]= static_cast<int>(amrex::Math::floor((p.pos(0)-plo[0])*dxi[0]));
                     cell[1]= static_cast<int>(amrex::Math::floor((p.pos(1)-plo[1])*dxi[1]));
                     cell[2]= static_cast<int>(amrex::Math::floor((p.pos(2)-plo[2])*dxi[2]));
                     cell += base;
-
+                    
                     const amrex::Real mag_vel_over_dx = amrex::Math::abs(p.rdata(1))*adxi[0];
                     const amrex::Real mag_vel_over_dy = amrex::Math::abs(p.rdata(2))*adxi[1];
                     const amrex::Real mag_vel_over_dz = amrex::Math::abs(p.rdata(3))*adxi[2];
@@ -432,21 +429,28 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
                     const amrex::Real aval_y = gfab(cell[0],cell[1],cell[2],1);
                     const amrex::Real aval_z = gfab(cell[0],cell[1],cell[2],2);
                     const amrex::Real mag_accel = std::sqrt(aval_x*aval_x+aval_y*aval_y+aval_z*aval_z);
-
+                    /*if(std::abs(mag_accel)>1e5 || std::abs(mag_accel)<1e-5){
+                        std::cout<<amrex::ParallelDescriptor::MyProc()<<"| dt: "<<1/std::sqrt(mag_accel*dxi[0])<<", mag_accel: "<< mag_accel<<std::endl;
+                        std::cout<<amrex::ParallelDescriptor::MyProc()<<"| cell: ["<<cell[0]<<","<<cell[1]<<","<<cell[2]<<"]"<<std::endl;
+                        std::cout<<amrex::ParallelDescriptor::MyProc()<<"| aval: ["<<aval_x<<","<<aval_y<<","<<aval_z<<"]"<<std::endl;
+                    }
+                    if(std::abs(max_mag_vel_over_dx)>1e5 || std::abs(max_mag_vel_over_dx)<1e-5){
+                        std::cout<<amrex::ParallelDescriptor::MyProc()<<"| dt_part: "<<dt_part<<", mag_vel_over: ["<<mag_vel_over_dx<<", "<<mag_vel_over_dy<<", "<<mag_vel_over_dz<<"]"<<std::endl;
+                    }*/
                     if (mag_accel > 0) {
                         dt_part = amrex::min( dt_part, 1/std::sqrt(mag_accel*dxi[0]) );
                     }
-
+                    
                     return dt_part;
                 }
 
                 return 1e50;
             });
         }
-
+        
         ReduceTuple hv = reduce_data.value();
         amrex::Real ldt_cpu = amrex::get<0>(hv);
-
+          
         dt = std::min(dt,ldt_cpu);
     }
 
