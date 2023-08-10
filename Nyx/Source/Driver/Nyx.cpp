@@ -1874,16 +1874,16 @@ Nyx::postCoarseTimeStep (Real cumtime)
             const DistributionMapping& newdmap = dm;
 
             //ACJ
-            amrex::BoxArray new_ba;
+            amrex::BoxArray newboxarray;
             if(dual_grid_load_balance)
-                new_ba = ba; //theDMPC()->ParticleBoxArray(lev);
+                newboxarray = ba; //theDMPC()->ParticleBoxArray(lev);
             else
-                new_ba = parent->boxArray(lev);
+                newboxarray = parent->boxArray(lev);
             //ACJ
 
 
             if(verbose > 2)
-              amrex::Print()<<"Using ba: "<<new_ba<<"\nUsing dm: "<<newdmap<<std::endl;     
+              amrex::Print()<<"Using ba: "<<newboxarray<<"\nUsing dm: "<<newdmap<<std::endl;     
             
             for (int i = 0; i < theActiveParticles().size(); i++)
             {
@@ -1894,7 +1894,7 @@ Nyx::postCoarseTimeStep (Real cumtime)
                                                            theActiveParticles()[i]->finestLevel(),
                                                            1);
               */
-                 cs->theActiveParticles()[i]->Regrid(newdmap, new_ba, lev); //ACJ
+                 cs->theActiveParticles()[i]->Regrid(newdmap, newboxarray, lev); //ACJ
 
                  if(shrink_to_fit)
                      cs->theActiveParticles()[i]->ShrinkToFit(); 
@@ -1903,12 +1903,12 @@ Nyx::postCoarseTimeStep (Real cumtime)
 
             if(cs->Nyx::theVirtPC() != 0)
             {
-                cs->Nyx::theVirtPC()->Regrid(newdmap, new_ba, lev);
+                cs->Nyx::theVirtPC()->Regrid(newdmap, newboxarray, lev);
             }
 
             if(cs->Nyx::theGhostPC() != 0)
             {
-                cs->Nyx::theGhostPC()->Regrid(newdmap, new_ba, lev);
+                cs->Nyx::theGhostPC()->Regrid(newdmap, newboxarray, lev);
             }
 
             amrex::Gpu::streamSynchronize();

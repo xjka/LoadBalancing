@@ -370,7 +370,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
 
     long num_particles_at_level = 0;
 
-    std::unique_ptr<amrex::MultiFab> ac_pointer;
+    std::unique_ptr<amrex::MultiFab> ac_pointer = NULL; //ACJ : set to NULL explicitly for sake of correctness for later logic
     if (!this->OnSameGrids(lev, acceleration))
     {
         ac_pointer.reset(new amrex::MultiFab(this->m_gdb->ParticleBoxArray(lev),
