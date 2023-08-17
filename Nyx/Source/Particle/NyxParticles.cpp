@@ -1083,10 +1083,12 @@ Nyx::init_santa_barbara (int init_sb_vels)
         BL_PROFILE_VAR_STOP(CA_init);
 
         // Add the particle density to the gas density 
-        if(dual_grid_load_balance)                                             //ACJ
-            S_new.ParallelAdd(*particle_mf[level], 0, Density_comp, 1, 1, 1);  //ACJ - the last two arguments (src_nghosts & dst_nghosts) being equal should be equivalent to single nghosts argument for Add()
-        else                                                                 //ACJ
+        if(particle_mf[level]->boxArray().CellEqual(S_new.boxArray()) && 
+                particle_mf[level]->DistributionMap()==S_new.DistributionMap()) //ACJ
             MultiFab::Add(S_new, *particle_mf[level], 0, Density_comp, 1, 1);
+        else
+            //ACJ - the last two arguments (src_nghosts & dst_nghosts) being equal should be equivalent to single nghosts argument for Add()
+            S_new.ParallelAdd(*particle_mf[level], 0, Density_comp, 1, 1, 1); //ACJ
      
         if (init_sb_vels == 1)
         {
@@ -1096,10 +1098,12 @@ Nyx::init_santa_barbara (int init_sb_vels)
             }
 
             // Add the particle momenta to the gas momenta (initially zero)
-            if(dual_grid_load_balance)                                                         //ACJ
-                S_new.ParallelAdd(*particle_mf[level], 1, Xmom_comp, AMREX_SPACEDIM, S_new.nGrow(), S_new.nGrow());  //ACJ the last two agrguments (src_nghosts & dst_nghosts) being equal should be equivalent to below
-            else                                                                                       //ACJ
+            if(particle_mf[level]->boxArray().CellEqual(S_new.boxArray()) && 
+                    particle_mf[level]->DistributionMap()==S_new.DistributionMap()) //ACJ
                 MultiFab::Add(S_new, *particle_mf[level], 1, Xmom_comp, AMREX_SPACEDIM, S_new.nGrow());
+            else
+                //ACJ the last two arguments (src_nghosts & dst_nghosts) being equal should be equivalent to above
+                S_new.ParallelAdd(*particle_mf[level], 1, Xmom_comp, AMREX_SPACEDIM, S_new.nGrow(), S_new.nGrow()); //aCJ
         }
 
         enforce_minimum_density_floor(S_new, new_a);

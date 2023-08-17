@@ -1058,7 +1058,14 @@ Gravity::AddParticlesToRhs (int               level,
       {
         Nyx::theActiveParticles()[i]->AssignDensitySingleLevel(particle_mf, level);
         amrex::Gpu::Device::streamSynchronize();
-        MultiFab::Add(Rhs, particle_mf, 0, 0, 1, 0);
+        //ACJ: modified to accomodate dual_grids
+        if(particle_mf.DistributionMap() == Rhs.DistributionMap() && 
+                particle_mf.boxArray().CellEqual(Rhs.boxArray())) //ACJ
+            MultiFab::Add(Rhs, particle_mf, 0, 0, 1, 0);
+        else //ACJ
+            Rhs.ParallelAdd(particle_mf); //ACJ
+        
+        //ACJ
       }
 
     amrex::Gpu::Device::streamSynchronize();

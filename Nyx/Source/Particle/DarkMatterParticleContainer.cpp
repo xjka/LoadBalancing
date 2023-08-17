@@ -347,11 +347,13 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
     {
         new_box = remain.chop(min_chop_dir, chop_pos_bydir[min_chop_dir]);
         new_box_np = np_cutoff_bydir[min_chop_dir];
+        fbl_vec[o_box_id] = remain;
+        std::cout<<ParallelDescriptor::MyProc()<<"| remain: "<<remain<<", newbox: "<<new_box<<std::endl;
     }
     else
         new_box_np = -2;
 
-    fbl_vec[o_box_id] = remain;  
+      
     return new_box;
 }
 //ACJ
@@ -513,30 +515,14 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     MPI_Group world_group, overload_group;
     MPI_Comm_dup(ParallelDescriptor::Communicator(), &world_comm_dup);
     MPI_Comm_group(world_comm_dup, &world_group);
-    int overload_tag = 0;
- 
-
-//ACJ
-/*{
-    volatile int gdb = 0;
-    char hostname[256];
-    gethostname(hostname, sizeof(hostname));
-    printf("rank %d PID %d on %s ready for attach\n", amrex::ParallelDescriptor::MyProc(), getpid(), hostname);
-    fflush(stdout);
-    if(amrex::ParallelDescriptor::MyProc()==0){
-        while (0 == gdb){
-            usleep(1000);
-        }
-    }
-    amrex::ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
-}*/
-//ACJ     
+    int overload_tag = 0; 
     
     while(am_overload_rank)
     { 
         //create appropriate comunicator from group
         MPI_Group_incl(world_group, overload_ranks.size(), overload_ranks.dataPtr(), &overload_group);
         MPI_Comm_create_group(world_comm_dup, overload_group, overload_tag, &overload_comm); 
+        ParallelContext::push(overload_comm);
 
         if(should_exec)
         {
@@ -622,8 +608,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                         //in the sense that if we recieve a new u_rank after re-assessing it can only have the same
                         //or less space, and the space in this one won't change by running the loop again. So just need to 
                         //drop this box. 
-                        if(pcount_rank_diff[u_rank]==0){
-                            std::cout<<MyProc<<"| removing box with np: "<<o_box_list.front().second<<", new_box_np code: "<<new_box_np<<std::endl; 
+                        if(pcount_rank_diff[u_rank]==0){ 
                             num_2_rmv -= o_box_list.front().second;
                             pcount_rank_diff[o_rank] -= o_box_list.front().second;
                             o_box_list.pop_front();
@@ -642,7 +627,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         //
         //need to synchronize changes in pcount_rank across processes
         MPI_Allreduce(MPI_IN_PLACE, pcount_rank_diff.dataPtr(), pcount_rank_diff.size(), 
-                MPI_INT, MPI_SUM, overload_comm);
+                MPI_INT, MPI_SUM, ParallelContext::CommunicatorSub()); //overload_comm);
         //now add up differences in pcount_rank
         for(int i=0; i<pcount_rank.size(); ++i){
             pcount_rank[i] += pcount_rank_diff[i];
@@ -658,6 +643,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         should_exec = should_execute(o_q, u_q, o_rank, o_rank_np, u_rank, u_rank_np, am_overload_rank); 
 
         //free the overload comm  and group for next iteration
+        ParallelContext::pop();
         MPI_Comm_free(&overload_comm); 
         MPI_Group_free(&overload_group);
 
@@ -723,19 +709,12 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         Box(IntVect{lbound_buf[3*i], lbound_buf[3*i+1], lbound_buf[3*i+2]},
             IntVect{ubound_buf[3*i], ubound_buf[3*i+1], ubound_buf[3*i+2]});
     }
-        
+    
     // ba and dmap to particle container
     new_ba = BoxArray(fbl); //SetParticleBoxArray(lev, BoxArray(fbl));
     new_dm = DistributionMapping(new_ppmap); //SetParticleDistributionMap(lev, DistributionMapping(new_ppmap)); 
    
     amrex::Print()<<"done."<<std::endl;
-
-    /*std::cout<<MyProc<<"|fbl_vec.size()="<<ParticleBoxArray(lev).boxList().data().size()<<", new_ppmap.size()="<<ParticleDistributionMap(lev).ProcessorMap().size()<<std::endl;
-    for(int i=0; i<fbl.data().size(); i++){
-        auto b = ParticleBoxArray(lev).boxList().data()[i];
-        int own_proc = ParticleDistributionMap(lev).ProcessorMap()[i];
-        std::cout<<MyProc<<"| proc:"<<own_proc<<", "<<"Lo:["<<b.smallEnd(0)<<","<<b.smallEnd(1)<<","<<b.smallEnd(2)<<"], Hi:["<<b.bigEnd(0)<<","<<b.bigEnd(1)<<","<<b.bigEnd(2)<<"]"<<std::endl;
-    }*/
 }
 //ACJ
 
@@ -1152,7 +1131,10 @@ DarkMatterParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
         }
         else
         {
-            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
+            //ACJ :don't copy ghosts using ParallelCopy 
+            //Instead copy cells and then fill ghosts afterwards
+            //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(), ng,ng);
+            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
             ac_ptr->FillBoundary();
         }
     }
@@ -1256,8 +1238,11 @@ DarkMatterParticleContainer::moveKick (MultiFab&       acceleration,
             ac_ptr->FillBoundary();
         }
         else
-        {
-            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
+        {   
+            //ACJ: don't copy ghosts using ParallelCopy
+            //instead just copy all valid cells and then fill ghosts 
+            //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
+            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
             ac_ptr->FillBoundary();
         }
     }
