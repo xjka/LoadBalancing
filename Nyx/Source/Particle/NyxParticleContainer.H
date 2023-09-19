@@ -375,83 +375,6 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
         }
     }
     
-    //ACJ
-    /*for(int otr=0; otr<2; otr++){
-    for(int p=0; p<amrex::ParallelDescriptor::NProcs(); p++){
-    if(p==amrex::ParallelDescriptor::MyProc()){
-   
-    if(otr==0){
-    std::cout<<amrex::ParallelDescriptor::MyProc()<<"| len: "<< acceleration.boxArray().size()<<", acceleration: "<<std::endl;
-    for(amrex::MFIter mfi(acceleration,false); mfi.isValid(); ++mfi){
-        std::cout<<amrex::ParallelDescriptor::MyProc()<<"| idx:"<<mfi.index()<<", box:"<<acceleration.boxArray()[mfi.index()]<<std::endl;
-        std::cout<<amrex::ParallelDescriptor::MyProc()<<"| "<<acceleration[mfi]<<std::endl;
-
-    }
-    }
-    else{
-    if(ac_pointer){ 
-        std::cout<<amrex::ParallelDescriptor::MyProc()<<"| len: "<< ac_pointer->boxArray().size()<<", ac_pointer: "<<std::endl;
-        for(amrex::MFIter mfi(*ac_pointer,false); mfi.isValid(); ++mfi){
-            std::cout<<amrex::ParallelDescriptor::MyProc()<<"| idx:"<<mfi.index()<<", box:"<<(*ac_pointer).boxArray()[mfi.index()]<<std::endl;    
-            std::cout<<amrex::ParallelDescriptor::MyProc()<<"| "<<(*ac_pointer)[mfi]<<std::endl;
-        }
-    }
-    }
-    }
-    amrex::ParallelDescriptor::Barrier();
-    }
-    
-    }*/
-    /*amrex::Print()<<"nGrow: "<<acceleration.nGrow()<<std::endl;
-    amrex::Print()<<"nGrowVect: "<<acceleration.nGrowVect()<<std::endl;
-    amrex::Vector<amrex::Box> bl, bl2;
-    amrex::Vector<int> xlo{0,2}, ylo{0,2}, zlo{0,2}, zlo2{0,2};
-    amrex::Vector<int> xhi{1,3}, yhi{1,3}, zhi{1,5}, zhi2{1,5};
-    for( int i=0; i<xlo.size(); i++){
-        for(int j=0; j<ylo.size(); j++){
-            for (int k=0; k<zlo.size(); k++)
-                bl.push_back(amrex::Box(amrex::IntVect{xlo[i],ylo[j],zlo[k]}, amrex::IntVect{xhi[i], yhi[j], zhi[k]}));
-            for(int k2=0; k2<zlo2.size(); k2++)
-                bl2.push_back(amrex::Box(amrex::IntVect{xlo[i],ylo[j],zlo2[k2]}, amrex::IntVect{xhi[i],yhi[j],zhi2[k2]}));
-        }
-    }
-    amrex::MultiFab testmf(amrex::BoxArray(std::move(amrex::BoxList(std::move(bl)))), amrex::DistributionMapping({0,0,1,1,2,2,3,3}), AMREX_SPACEDIM, acceleration.nGrow());
-    for(amrex::MFIter mfi(testmf,false); mfi.isValid(); ++mfi)
-        testmf[mfi].setVal(amrex::ParallelDescriptor::MyProc(), testmf.boxArray()[mfi.index()] ,0,3); 
-    amrex::MultiFab testmf2(amrex::BoxArray(std::move(amrex::BoxList(std::move(bl2)))), amrex::DistributionMapping({1,1,2,2,3,3,0,0}), AMREX_SPACEDIM, acceleration.nGrow());
-    testmf2.ParallelCopy(testmf,0,0,AMREX_SPACEDIM, 0,0); //acceleration.nGrowVect(), acceleration.nGrowVect());
-    testmf2.FillBoundary();
-    for(int p=0; p<amrex::ParallelDescriptor::NProcs(); p++)
-    {
-        if(amrex::ParallelDescriptor::MyProc()==p){
-            amrex::Vector<int> bids;
-            for(amrex::MFIter mfi(testmf, false); mfi.isValid(); ++mfi){
-            //    bids.push_back(mfi.index());
-            //for(int boxid : bids){
-            //    auto box = testmf.boxArray()[boxid];
-                std::cout<<amrex::ParallelDescriptor::MyProc()<<"| idx:"<<mfi.index()<<", box:"<<testmf.boxArray()[mfi.index()]<<std::endl;
-            //    for(int ix=box.smallEnd(0); ix<=box.bigEnd(0); ++ix)
-            //        for(int iy=box.smallEnd(1); iy<=box.bigEnd(1); ++iy)
-            //            for(int iz=box.smallEnd(2); iz<=box.bigEnd(2); ++iz)
-            //                amrex::print_state(testmf, amrex::IntVect(ix,iy,iz));
-                std::cout<<amrex::ParallelDescriptor::MyProc()<<"\nmf:"<<testmf[mfi]<<std::endl;
-            }
-            //bids.clear();
-            for(amrex::MFIter mfi2(testmf2, false); mfi2.isValid(); ++mfi2){
-            //    bids.push_back(mfi2.index());
-            //for(int boxid : bids){    
-            //    auto box = testmf2.boxArray()[boxid];
-                std::cout<<amrex::ParallelDescriptor::MyProc()<<"| idx:"<<mfi2.index()<<", box2:"<<testmf2.boxArray()[mfi2.index()]<<std::endl;
-             //   for(int ix=box.smallEnd(0); ix<=box.bigEnd(0); ++ix)
-             //       for(int iy=box.smallEnd(1); iy<=box.bigEnd(1); ++iy)
-             //           for(int iz=box.smallEnd(2); iz<=box.bigEnd(2); ++iz)
-             //               amrex::print_state(testmf2, amrex::IntVect(ix,iy,iz));
-                std::cout<<amrex::ParallelDescriptor::MyProc()<<"\nmf2:"<<testmf2[mfi2]<<std::endl;
-            }
-        }
-        amrex::ParallelDescriptor::Barrier();
-    }*/
-    //ACJ
 
 #ifdef _OPENMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion()) reduction(min:dt)
@@ -477,12 +400,11 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
 
                 if (p.id() > 0)
                 {
-                    //amrex::IntVect cell;
-                    //cell[0]= static_cast<int>(amrex::Math::floor((p.pos(0)-plo[0])*dxi[0]));
-                    //cell[1]= static_cast<int>(amrex::Math::floor((p.pos(1)-plo[1])*dxi[1]));
-                    //cell[2]= static_cast<int>(amrex::Math::floor((p.pos(2)-plo[2])*dxi[2]));
-                    //cell += base;
-                    amrex::IntVect cell = getParticleCell(p, plo, dxi, geom.Domain()); //ACJ: more integrated way to get cell
+                    amrex::IntVect cell;
+                    cell[0]= static_cast<int>(amrex::Math::floor((p.pos(0)-plo[0])*dxi[0]));
+                    cell[1]= static_cast<int>(amrex::Math::floor((p.pos(1)-plo[1])*dxi[1]));
+                    cell[2]= static_cast<int>(amrex::Math::floor((p.pos(2)-plo[2])*dxi[2]));
+                    cell += base;
 
                     const amrex::Real mag_vel_over_dx = amrex::Math::abs(p.rdata(1))*adxi[0];
                     const amrex::Real mag_vel_over_dy = amrex::Math::abs(p.rdata(2))*adxi[1];

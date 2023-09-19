@@ -213,10 +213,10 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
     Array4<int const> const& np_arr = np_fab.const_array();
     const int*               np_ptr = np_arr.dataPtr();
     
-    Box     remain0 = fbl_vec0[o_box_id]; //fbox0; this is use to get strides so that you can continue to iterate into np_mf_f
-    Box     remain  = fbl_vec[o_box_id]; //this is actual Vector of boxes for new gridding distribution
-    IntVect lo     = remain.smallEnd(); //fbox0.smallEnd();
-    IntVect stride   {1, remain0.length(0), remain0.length(0)*remain0.length(1)};
+    Box remain0 = fbl_vec0[o_box_id]; //fbox0; this is use to get strides so that you can continue to iterate into np_mf_f
+    Box remain  = fbl_vec[o_box_id]; //this is actual Vector of boxes for new gridding distribution
+    IntVect lo  = remain.smallEnd(); //fbox0.smallEnd();
+    IntVect stride {1, remain0.length(0), remain0.length(0)*remain0.length(1)};
     
     int np_target_lo = static_cast<int>(np_target * 0.95);
     int np_target_hi = static_cast<int>(np_target * 1.05);
@@ -266,7 +266,6 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
         {
             Box dummy;
             new_box_np = -1;
-            std::cout<<ParallelDescriptor::MyProc()<<"| room:"<<room<<", np_tmp+np_slice"<<np_tmp+np_slice<<", chop_hi: "<<chop_hi<<", chop_pos: "<<chop_pos<<std::endl;
             return dummy;
         }
         else
@@ -348,7 +347,6 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
         new_box = remain.chop(min_chop_dir, chop_pos_bydir[min_chop_dir]);
         new_box_np = np_cutoff_bydir[min_chop_dir];
         fbl_vec[o_box_id] = remain;
-        std::cout<<ParallelDescriptor::MyProc()<<"| remain: "<<remain<<", newbox: "<<new_box<<std::endl;
     }
     else
         new_box_np = -2;
@@ -452,6 +450,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         pcount_fbox[fboxid] += pti.numParticles();
     }
     ParallelDescriptor::ReduceIntSum(pcount_fbox.dataPtr(), pcount_fbox.size());
+    //Vector<long> pcount_fbox = this->NumberOfParticlesInGrid(lev, true, false);
 
     // count particles by rank
     Vector<int> pcount_rank(NProcs, 0), pcount_rank_diff(NProcs, 0);
@@ -466,12 +465,24 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     std::iota(m_pboxid_to_fboxid.begin(), m_pboxid_to_fboxid.end(), 0);
 
     // count total # particles
-    if (m_total_numparticle <= 0) {
+    /*if (m_total_numparticle <= 0) {
         m_total_numparticle = 0;
         for (MyParIter pti(*this, lev); pti.isValid(); ++pti)
             m_total_numparticle += static_cast<long>(pti.numRealParticles());
         ParallelDescriptor::ReduceLongSum(m_total_numparticle);
-    }
+    }*/
+
+    // particle counts based on particle grids
+    MultiFab np_mf_p(fba, fdmap, 1, 0); //ParticleBoxArray(lev), ParticleDistributionMap(lev), 1, 0);
+    np_mf_p.setVal(0);
+    //countParticle(lev, np_mf_p);                
+    m_total_numparticle = IncrementWithTotal(np_mf_p, lev, false);
+    // particle counts based on fluid grids
+    iMultiFab np_mf_f(The_Pinned_Arena());
+    np_mf_f.define(fba, fdmap, 1, 0);
+    // copy the counts over
+    //np_mf_f.ParallelCopy(np_mf_p);
+    Copy(np_mf_f, np_mf_p, 0,0,1,0);
 
     // find the underload and overload tolerances
     if (overload_toler<=1)
@@ -486,16 +497,6 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
 
     //now actually start the redivisioning algorithm
     amrex::Print()<<"starting 3D load_balance algorithm..."<<std::flush;
-
-    // particle counts based on particle grids
-    iMultiFab np_mf_p(ParticleBoxArray(lev), ParticleDistributionMap(lev), 1, 0);
-    np_mf_p.setVal(0);
-    // particle counts based on fluid grids
-    iMultiFab np_mf_f(The_Pinned_Arena());
-    np_mf_f.define(fba, fdmap, 1, 0);
-    // count the particles and copy across grids
-    countParticle(lev, np_mf_p);                
-    np_mf_f.ParallelCopy(np_mf_p);
 
     //new box->processor map
     Vector<int> new_ppmap(fpmap), ppmap_chngs(fpmap.size(), 0);    
@@ -516,7 +517,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     MPI_Comm_dup(ParallelDescriptor::Communicator(), &world_comm_dup);
     MPI_Comm_group(world_comm_dup, &world_group);
     int overload_tag = 0; 
-    
+
     while(am_overload_rank)
     { 
         //create appropriate comunicator from group
@@ -1131,11 +1132,11 @@ DarkMatterParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
         }
         else
         {
-            //ACJ :don't copy ghosts using ParallelCopy 
+            //ACJ :don't copy ghosts in ParallelCopy 
             //Instead copy cells and then fill ghosts afterwards
             //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(), ng,ng);
             ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
-            ac_ptr->FillBoundary();
+            ac_ptr->FillBoundary(this->m_gdb->Geom(lev).periodicity()); //ACJ carry over the periodicity info
         }
     }
 
@@ -1243,7 +1244,7 @@ DarkMatterParticleContainer::moveKick (MultiFab&       acceleration,
             //instead just copy all valid cells and then fill ghosts 
             //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
             ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
-            ac_ptr->FillBoundary();
+            ac_ptr->FillBoundary(this->m_gdb->Geom(lev).periodicity()); //ACJ carry over the periodicity info
         }
     }
 

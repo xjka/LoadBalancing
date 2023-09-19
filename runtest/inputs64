@@ -1,4 +1,4 @@
-nyx.load_balance_int = 3
+nyx.load_balance_int = 32
 nyx.load_balance_start_z = 199
   
 nyx.dual_grid_load_balance = 1
@@ -46,7 +46,7 @@ amr.data_log = runlog
 
 #This is how we restart from a checkpoint and write an ascii particle file
 #Leave this commented out in cvs version
-amr.restart = chk00446
+amr.restart = chk00316
 #max_step = 4
 #particles.particle_output_file = particle_output
 
@@ -62,8 +62,8 @@ geometry.prob_lo     =  0     0     0
 #Domain size in Mpc
 geometry.prob_hi     =  28.49002849  28.49002849  28.49002849
 
-amr.n_cell           =  64  64  64
-amr.max_grid_size    = 32
+amr.n_cell           =  128 128  128
+amr.max_grid_size    = 8
 #fabarray.mfiter_tile_size = 128 8 8
 fabarray.mfiter_tile_size = 1024000 8 8
 
@@ -129,7 +129,7 @@ amr.max_level          = 0        # maximum level number allowed
 #amr.n_error_buf        = 0 0 0 8
 #amr.refine_grid_layout = 1
 amr.regrid_on_restart  = 1
-#amr.blocking_factor    = 32
+#amr.blocking_factor    = 1 #32
 #amr.nosub              = 1
 
 amr.refinement_indicators = density
@@ -139,14 +139,14 @@ amr.density.field_name = denvol
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1
 amr.check_file        = chk
-amr.check_int         = 100
+amr.check_int         = 4
 amr.checkpoint_nfiles = 64
 
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file       = plt
-amr.plot_int        = -1
-nyx.plot_z_values   = 7.0 6.0 5.0 4.0 3.0 2.0
+amr.plot_int        = 4
+#nyx.plot_z_values   = 7.0 6.0 5.0 4.0 3.0 2.0
 
 amr.plot_vars        = density xmom ymom zmom rho_e Temp phi_grav
 amr.derive_plot_vars = particle_mass_density particle_count
