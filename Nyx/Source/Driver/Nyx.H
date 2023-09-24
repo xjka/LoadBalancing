@@ -809,18 +809,10 @@ int integrate_state_struct
                               std::string &FullPath);
     //! Create the Level_ and other directories in checkpoint and plot files
     virtual void CreateLevelDirectory (const std::string &dir) override;
-
-    static amrex::IntVect particle_max_grid_size; //ACJ
-    static int particle_max_grid_size_x;    //ACJ
-    static int particle_max_grid_size_y;   //ACJ
-    static int particle_max_grid_size_z;    //ACJ
     
     static bool dual_grid_load_balance;  //ACJ
     static amrex::Real overload_toler;  //ACJ
     static amrex::Real underload_toler; //ACJ  
-
-    void ChopGrids (const amrex::Box& domain, amrex::BoxArray& ba, int target_size) const; //ACJ
-    amrex::BoxArray MakeBaseGrids (const amrex::Box& domain, const amrex::IntVect& grid_sizes)  const; //ACJ
 
 protected:
 

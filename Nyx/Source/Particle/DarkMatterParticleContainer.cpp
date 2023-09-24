@@ -1132,11 +1132,11 @@ DarkMatterParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
         }
         else
         {
-            //ACJ :don't copy ghosts in ParallelCopy 
-            //Instead copy cells and then fill ghosts afterwards
+            //ACJ :don't copy ghosts in ParallelCopy (they will overwrite valid cells.)
+            //Instead copy cells and then fill ghosts afterwards.
             //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(), ng,ng);
             ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
-            ac_ptr->FillBoundary(this->m_gdb->Geom(lev).periodicity()); //ACJ carry over the periodicity info
+            ac_ptr->FillBoundary(); 
         }
     }
 
@@ -1244,7 +1244,7 @@ DarkMatterParticleContainer::moveKick (MultiFab&       acceleration,
             //instead just copy all valid cells and then fill ghosts 
             //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
             ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
-            ac_ptr->FillBoundary(this->m_gdb->Geom(lev).periodicity()); //ACJ carry over the periodicity info
+            ac_ptr->FillBoundary(); 
         }
     }
 

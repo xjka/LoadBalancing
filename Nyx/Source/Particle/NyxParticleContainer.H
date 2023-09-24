@@ -330,6 +330,10 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
     return estTimestep(acceleration,1.0,lev,cfl);
 }
 
+
+
+
+
 template <int NSR,int NSI,int NAR,int NAI>
 amrex::Real
 NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       acceleration,
@@ -368,13 +372,14 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
         }
         else
         {
-            //ACJ don't want to copy ghosts in ParallelCopy, want to use FillBoundary to get them (if needed)
+            //ACJ don't try to copy ghosts using ParallelCopy (will copy any garbage ghost values over valid cells)). 
+            //Use FillBoundary instead if want ghosts. 
             //ac_pointer->ParallelCopy(acceleration,0,0,AMREX_SPACEDIM, acceleration.nGrowVect(),acceleration.nGrowVect());
             ac_pointer->ParallelCopy(acceleration,0,0,AMREX_SPACEDIM, 0,0);
-            ac_pointer->FillBoundary(geom.periodicity()); // DO WE NEED GHOST CELLS FILLED ???
+            ac_pointer->FillBoundary(); //geom.periodicity()); // DO WE NEED GHOST CELLS FILLED ???
         }
     }
-    
+
 
 #ifdef _OPENMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion()) reduction(min:dt)

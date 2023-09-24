@@ -44,7 +44,8 @@ AGNParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
         }
         else
         {
-            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
+            //ACJ don't copy ghosts with ParallelCopy
+            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0); //ng,ng);
             ac_ptr->FillBoundary();
         }
     }

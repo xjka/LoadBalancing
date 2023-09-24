@@ -154,13 +154,6 @@ Real Nyx::particle_cfl = 0.5;
 Real Nyx::neutrino_cfl = 0.5;
 #endif
 
-amrex::IntVect Nyx::particle_max_grid_size = (AMREX_SPACEDIM == 2) ? IntVect(128,128,128)
-                                                   : IntVect(32,32,32);; //ACJ
-int Nyx::particle_max_grid_size_x = -1;    //ACJ
-int Nyx::particle_max_grid_size_y = -1;   //ACJ
-int Nyx::particle_max_grid_size_z = -1;    //ACJ
-
-
 
 Vector<NyxParticleContainerBase*>&
 Nyx::theActiveParticles ()
@@ -383,112 +376,6 @@ Nyx::read_particle_params ()
 #endif
 }
 
-//ACJ
-/*
-void
-PruneBaseGrids (BoxArray &ba) const
-{
-    // Use 1 ghost layer
-    EBDataCollection ebdc(*eb_levels[0], geom[0],
-          ba, DistributionMapping{ba}, {1}, EBSupport::basic);
-
-    const auto &cflag = ebdc.getMultiEBCellFlagFab();
-    Vector<Box> uncovered;
-
-    for (MFIter mfi(cflag); mfi.isValid(); ++mfi)
-    {
-        FabType t = cflag[mfi].getType();
-        const Box& vbx = mfi.validbox();
-        if (t != FabType::covered) {
-            uncovered.push_back(vbx);
-        }
-    }
-    amrex::AllGatherBoxes(uncovered);
-    ba = BoxArray(BoxList(std::move(uncovered)));
-}
-*/
-//ACJ
-
-//ACJ
-void
-Nyx::ChopGrids (const Box& domain, BoxArray& ba, int target_size) const
-{
-    if ( ParallelDescriptor::IOProcessor() )
-       amrex::Warning("Using max_grid_size only did not make enough grids for the number of processors");
-
-    // Here we hard-wire the maximum number of times we divide the boxes.
-    int n = 10;
-
-    // Here we hard-wire the minimum size in any one direction the boxes can be
-    int min_grid_size = 4;
-
-    IntVect chunk(domain.length(0),domain.length(1),domain.length(2));
-
-    int j = -1;
-    for (int cnt = 1; cnt <= n; ++cnt)
-    {
-        if (chunk[0] >= chunk[1] && chunk[0] >= chunk[2])
-        {
-            j = 0;
-        }
-        else if (chunk[1] >= chunk[0] && chunk[1] >= chunk[2])
-        {
-            j = 1;
-        }
-        else if (chunk[2] >= chunk[0] && chunk[2] >= chunk[1])
-        {
-            j = 2;
-        }
-        chunk[j] /= 2;
-
-        if (chunk[j] >= min_grid_size)
-        {
-            ba.maxSize(chunk);
-        }
-        else
-        {
-            // chunk[j] was the biggest chunk -- if this is too small then we're done
-            if ( ParallelDescriptor::IOProcessor() )
-               amrex::Warning("ChopGrids was unable to make enough grids for the number of processors");
-            return;
-        }
-
-        // Test if we now have enough grids
-        if (ba.size() >= target_size)
-          return;
-    }
-}
-//ACJ
-
-//ACJ
-BoxArray
-Nyx::MakeBaseGrids (const Box& domain, const IntVect& grid_sizes)  const
-{
-    BoxArray ba(domain);
-    ba.maxSize(grid_sizes);
-
-    //if (m_grid_pruning) {
-    //   PruneBaseGrids(ba);
-    //}
-
-    // We only call ChopGrids if dividing up the grid using max_grid_size didn't
-    //    create enough grids to have at least one grid per processor.
-    // This option is controlled by "refine_grid_layout" which defaults to true.
-    // TODO: this should only be called through init_particles since it reads input file
-    ParmParse pp("amr");
-    int refineGridLayout = true;
-    pp.query("refine_grid_layout", refineGridLayout); 
-    if (refineGridLayout && ba.size() < ParallelDescriptor::NProcs())
-        ChopGrids(parent->Geom(0).Domain(), ba, ParallelDescriptor::NProcs());
-
-    if (ba == parent->boxArray(0)){ //grids[0]) {
-        ba = parent->boxArray(0); //grids[0];  // to avoid duplicates
-    }
-
-    amrex::Print() << "In MakeBaseGrids: BA HAS " << ba.size() << " GRIDS " << std::endl;
-    return ba;
-}
-//ACJ
 
 void
 Nyx::init_particles ()
@@ -505,132 +392,21 @@ Nyx::init_particles ()
     {
         BL_ASSERT (DMPC == 0);
         
-        //BoxList             pbl; //ACJ
-        //BoxArray            pba; //ACJ
-        //DistributionMapping pdm; //ACJ
-        //Vector<int>         pboxmap;  // ACJ| map each particle box to its parent fluid box
-
-        //if (!Nyx::dual_grid_load_balance) { //ACJ
-        //  pbl = parent->boxArray(0).boxList(); //ACJ
-        //  pba = parent->boxArray(0);           //ACJ
-        //  pdm = parent->DistributionMap(0);   //ACJ
-          DMPC = new DarkMatterParticleContainer(parent); //ACJ
-          DMPC->setGreedyRegrid();
-        //}
-       /* 
-        else//ACJ 
-        { // dual_grid_load_balance is enabled
-
-            ////////////////////////////////////////////////////////////////////////////////
-            ParmParse pp("particles");
-            const int contains_size_x = pp.query("max_grid_size_x", particle_max_grid_size_x);
-            const int contains_size_y = pp.query("max_grid_size_y", particle_max_grid_size_y);
-            const int contains_size_z = pp.query("max_grid_size_z", particle_max_grid_size_z);
-
-            if (contains_size_x && contains_size_y && contains_size_z) {
-
-                particle_max_grid_size = IntVect(particle_max_grid_size_x,
-                                           particle_max_grid_size_y,
-                                           particle_max_grid_size_z);
-            } else {
-
-                AMREX_ALWAYS_ASSERT(!contains_size_x && !contains_size_y && !contains_size_z);
-
-                // set the particles grid equal to the fluid grid (for now hard code)
-                amrex::Vector<IntVect> maxGridSize(parent->maxLevel()+1);
-                for (int i = 0; i < parent->maxLevel()+1; ++i) {
-                    maxGridSize[i]   = (AMREX_SPACEDIM == 2) ? IntVect{AMREX_D_DECL(128,128,128)}
-                                                   : IntVect{AMREX_D_DECL(32,32,32)};
-                }
-                //TODO: obtain from amr? For now, just read. (is very redundant but fastest way now)
-                ParmParse ppamr("amr");
-                int cnt = ppamr.countval("max_grid_size");
-                if (cnt > 0) {
-                    Vector<int> mgs;
-                    ppamr.getarr("max_grid_size", mgs);
-                    int last_mgs = mgs.back();
-                    mgs.resize(parent->maxLevel()+1, last_mgs);
-                
-                    //SetMaxGridSize(mgs); everything below in if statement should be equivalent to this line
-                    for (int i = 0; i <= parent->maxLevel(); ++i) {
-                        maxGridSize[i] = IntVect{AMREX_D_DECL(mgs[i], mgs[i], mgs[i])};
-                    }
-                }         
-                particle_max_grid_size = maxGridSize[0]; //parent->max_grid_size[0];
-            }
-            ////////////////////////////////////////////////////////////////////////////////
-
-            // Define coarse level BoxArray and DistributionMap
-            const BoxArray& ba = MakeBaseGrids(parent->Geom(0).Domain(), particle_max_grid_size);
-
-            DistributionMapping dm;
-
-            // if want to use need to define "amrex::Vector<int> pmap;" in correct header DarkMatterParticleContainer.H ?
-            //if (pmap.empty())
-            dm.define(ba, ParallelDescriptor::NProcs());
-            //else
-            //    dm.define(pmap);
-
-            pbl = ba.boxList();
-            pba = ba;
-            pdm = dm;
-
-            // chop grids to use all the gpus for particle generation
-            if (ba.size() < ParallelDescriptor::NProcs()) {
-
-                IntVect reduced_size = particle_max_grid_size;
-
-                while (pbl.size() < ParallelDescriptor::NProcs()) {
-                    pbl.clear();
-                    pboxmap.clear();
-                    int maxdir = reduced_size.maxDir(false);
-                    reduced_size[maxdir] /= 2;
-
-                    for (auto i=0; i<pba.size(); i++) {
-                        BoxArray tmpba{pba[i]};
-                        tmpba.maxSize(reduced_size);
-                        pbl.join(tmpba.boxList());
-                        pboxmap.insert(pboxmap.end(), tmpba.size(), i);
-                    }
-                }
-                pba.define(pbl);
-                pdm.define(pba, ParallelDescriptor::NProcs());
-            }
-        
-            DMPC = new DarkMatterParticleContainer(parent->Geom(0), pdm, pba);
-            
-            //if (load_balance_type.compare("Greedy") == 0)
-            DMPC->setGreedyRegrid();
-            
-            //pc->setSortingBinSizes(IntVect(particle_sorting_bin));
-
-            if (!pboxmap.empty())
-                DMPC->setParticleFluidGridMap(pboxmap);
-        }  //end dual_grid_load_balance else  
-        //ACJ
-        */
+          DMPC = new DarkMatterParticleContainer(parent); 
+          DMPC->setGreedyRegrid(); //ACJ
 
         ActiveParticles.push_back(DMPC); 
 
         if (init_with_sph_particles == 1){
-            //if(dual_grid_load_balance)                                               //ACJ
-            //    SPHPC = new DarkMatterParticleContainer(parent->Geom(0), pdm, pba);  //ACJ
-            //else                                                                     //ACJ
                 SPHPC = new DarkMatterParticleContainer(parent);
         }
 
         if (parent->subCycle())
         {
-            //if(dual_grid_load_balance)                                                //ACJ
-            //    VirtPC = new DarkMatterParticleContainer(parent->Geom(0), pdm, pba);  //ACJ
-            //else                                                                      //ACJ
-                VirtPC = new DarkMatterParticleContainer(parent);
+            VirtPC = new DarkMatterParticleContainer(parent);
             VirtualParticles.push_back(VirtPC); 
             
-            //if(dual_grid_load_balance)                                                //ACJ
-            //    GhostPC = new DarkMatterParticleContainer(parent->Geom(0), pdm, pba); //ACJ
-            //else                                                                      //ACJ
-                GhostPC = new DarkMatterParticleContainer(parent);
+            GhostPC = new DarkMatterParticleContainer(parent);
             GhostParticles.push_back(GhostPC); 
         }
         //
