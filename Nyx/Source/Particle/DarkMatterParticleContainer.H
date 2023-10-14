@@ -67,15 +67,15 @@ public:
     }
 
     //ACJ 
-    DarkMatterParticleContainer(const amrex::Geometry& geom, const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba) 
-    : NyxParticleContainer<1+AMREX_SPACEDIM>(geom, dmap, ba)
-    {
-      real_comp_names.clear();
-      real_comp_names.push_back("mass");
-      real_comp_names.push_back("xvel");
-      real_comp_names.push_back("yvel");
-      real_comp_names.push_back("zvel");
-    }
+    //DarkMatterParticleContainer(const amrex::Geometry& geom, const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba) 
+    //: NyxParticleContainer<1+AMREX_SPACEDIM>(geom, dmap, ba)
+    //{
+    //  real_comp_names.clear();
+    //  real_comp_names.push_back("mass");
+    //  real_comp_names.push_back("xvel");
+    //  real_comp_names.push_back("yvel");
+    //  real_comp_names.push_back("zvel");
+    //}
     //ACJ
 
     using MyParIter = amrex::ParIter<1+AMREX_SPACEDIM>;

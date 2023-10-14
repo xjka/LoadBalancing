@@ -450,7 +450,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         pcount_fbox[fboxid] += pti.numParticles();
     }
     ParallelDescriptor::ReduceIntSum(pcount_fbox.dataPtr(), pcount_fbox.size());
-    //Vector<long> pcount_fbox = this->NumberOfParticlesInGrid(lev, true, false);
+    //Vector<long> pcount_fbox = this->NumberOfParticlesInGrid(lev, true, false); //Only can use if refining DMPC grid
 
     // count particles by rank
     Vector<int> pcount_rank(NProcs, 0), pcount_rank_diff(NProcs, 0);

@@ -64,8 +64,8 @@ public:
     {}
 
     //ACJ
-    NyxParticleContainer(const amrex::Geometry& geom, const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba) 
-        :  amrex::NeighborParticleContainer<NSR,NSI>(geom, dmap, ba, 1) {} 
+    //NyxParticleContainer(const amrex::Geometry& geom, const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba) 
+    //     :  amrex::NeighborParticleContainer<NSR,NSI>(geom, dmap, ba, 1) {} 
     //ACJ
 
     virtual ~NyxParticleContainer () {}

@@ -95,6 +95,7 @@ int Nyx::load_balance_strategy = DistributionMapping::SFC;
 bool Nyx::dual_grid_load_balance = false; //ACJ
 Real Nyx::overload_toler = 1.2; //ACJ
 Real Nyx::underload_toler = 0.8; //ACJ
+int Nyx::dual_grid_profile_freq = 1; //ACJ
 
 bool Nyx::dump_old = false;
 int Nyx::verbose      = 0;
@@ -441,7 +442,7 @@ Nyx::read_params ()
     pp_nyx.query("dual_grid_load_balance", dual_grid_load_balance); //ACJ
     pp_nyx.query("overload_toler", overload_toler); //ACJ
     pp_nyx.query("underload_toler", underload_toler); //ACJ
-
+    pp_nyx.query("dual_grid_profile_freq", dual_grid_profile_freq); //ACJ
 
     std::string theStrategy;
 

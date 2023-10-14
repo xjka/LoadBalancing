@@ -144,13 +144,16 @@ nyx_main (int argc, char* argv[])
 
     const Real time_before_main_loop = ParallelDescriptor::second();
 
+    BL_PROFILE_VAR_NS("nyx_main::LoadBalanceProfiling()", loadBalanceProfiling);
     std::vector<amrex::Vector<long>> rank_loads; //ACJ
     amrex::ParmParse ppn("nyx"); //ACJ
-    int loadBalanceInt = 100; //ACJ
+    int loadBalanceInt = 100, checkInt = 100, dualGridProfileFreq=1; //ACJ
     amrex::Real loadBalanceStartZ = 199; //ACJ
     ppn.query("load_balance_int", loadBalanceInt);  //ACJ
+    ppn.query("check_int", checkInt); //ACJ
     ppn.query("load_balance_start_z", loadBalanceStartZ); //ACJ
-
+    ppn.query("dual_grid_profile_freq", dualGridProfileFreq); //ACJ
+    
     bool finished(false);
     {
         BL_PROFILE_REGION("R::Nyx::coarseTimeStep");
@@ -187,24 +190,32 @@ nyx_main (int argc, char* argv[])
             }   
          
             //ACJ
-            int level_acj = 0;
-            amrex::Vector<long> gridloads = Nyx::theDMPC()->NumberOfParticlesInGrid(level_acj, true, false); //ACJ should be vector of number of particles per grid  
-            amrex::Vector<long> rankload(ParallelDescriptor::NProcs(), 0); //ACJ should be vector of processors for each boxid
-            if(ParallelDescriptor::IOProcessor())
+            int current_step  = amrptr->levelSteps(0);
+            if(ParallelDescriptor::IOProcessor() and (current_step%dualGridProfileFreq==0 or current_step%loadBalanceInt==0 ))
             {
+                BL_PROFILE_VAR_START(loadBalanceProfiling);
+                int level_acj = 0;
+                amrex::Vector<long> gridloads = Nyx::theDMPC()->NumberOfParticlesInGrid(level_acj, true, false);   
+                amrex::Vector<long> rankload(ParallelDescriptor::NProcs(), 0); //ACJ should be vector of processors for each boxid
+
+                //get current rank load (do this every time step)
                 int numboxes = Nyx::theDMPC()->ParticleDistributionMap(level_acj).size(); 
-                for (int boxid=0; boxid < numboxes; boxid++){ //ACJ
+                for (int boxid=0; boxid < numboxes; boxid++){ 
                     int proc = Nyx::theDMPC()->ParticleDistributionMap(level_acj)[boxid];
                     rankload[proc] += gridloads[boxid];
                 }
-                rank_loads.push_back(rankload); //ACJ
-            }
-
-            //ACJ
-            if(ParallelDescriptor::IOProcessor() && (amrptr->levelSteps(0)%loadBalanceInt == 0) && (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
-            {
-                std::cout<<"writing rank_loads, load_balance_int: "<<loadBalanceInt<<", load_balance_start_z: "<<loadBalanceStartZ<<std::endl;
-                write_rank_loads(Nyx::dual_grid_load_balance, rank_loads);
+                rank_loads.push_back(rankload); 
+                
+                //if output time-step, output current rank_loads
+                //if(amrptr->levelSteps(0)%loadBalanceInt == 0) and (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
+                if(current_step%checkInt==0 or current_step%loadBalanceInt==0){ //write output whenever we write a checkpoint
+                    write_rank_loads(Nyx::dual_grid_load_balance, rank_loads);
+                }
+                BL_PROFILE_VAR_STOP(loadBalanceProfiling);
+                if(current_step%checkInt==0 or current_step%loadBalanceInt==0){
+                    amrex::Print()<<"STEP: "<<current_step<<", Tiny Profiling Output:"<<std::endl;
+                    BL_PROFILE_TINY_FLUSH();
+                }
             }
             //ACJ
 

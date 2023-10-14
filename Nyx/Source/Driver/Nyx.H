@@ -813,6 +813,7 @@ int integrate_state_struct
     static bool dual_grid_load_balance;  //ACJ
     static amrex::Real overload_toler;  //ACJ
     static amrex::Real underload_toler; //ACJ  
+    static int dual_grid_profile_freq; //ACJ
 
 protected:
 
