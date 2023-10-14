@@ -191,7 +191,7 @@ nyx_main (int argc, char* argv[])
          
             //ACJ
             int current_step  = amrptr->levelSteps(0);
-            if(current_step%dualGridProfileFreq==0 or current_step%loadBalanceInt==0)
+            if(current_step%dualGridProfileFreq==0 or current_step%loadBalanceInt==0 or current_step%loadBalanceInt==loadBalanceInt-1)
             {
                 BL_PROFILE_VAR_START(loadBalanceProfiling);
                 int level_acj = 0;
@@ -215,7 +215,7 @@ nyx_main (int argc, char* argv[])
                     }
                 }
                 BL_PROFILE_VAR_STOP(loadBalanceProfiling);
-                if(ParallelDescriptor::IOProcessor() and (current_step%checkInt==0 or current_step%loadBalanceInt==0)){
+                if(current_step%checkInt==0){
                     amrex::Print()<<"STEP: "<<current_step<<", Tiny Profiling Output:"<<std::endl;
                     BL_PROFILE_TINY_FLUSH();
                 }
