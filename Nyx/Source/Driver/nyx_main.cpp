@@ -51,7 +51,7 @@ const int quitSignal(-44);
 amrex::LevelBld* getLevelBld ();
 
 //ACJ
-void write_rank_loads(const bool & dual_grid_load_balance, const std::vector<amrex::Vector<long>> & rank_loads)
+void write_rank_loads(const bool & dual_grid_load_balance, const std::vector<amrex::Vector<long>> & rank_loads, std::vector<int> steps)
 {
     //write the rank loads over times  
     std::string rankloadfile;
@@ -60,8 +60,10 @@ void write_rank_loads(const bool & dual_grid_load_balance, const std::vector<amr
     else
         rankloadfile = "rank_loads";
     std::ofstream rl_outfile(rankloadfile.c_str(), std::ios::out|std::ios::binary); 
-    long numsteps = rank_loads.size();                                                    
-    rl_outfile.write((char*)&numsteps, sizeof(long)); 
+    long numsteps = rank_loads.size();        
+    rl_outfile.write((char*)&numsteps, sizeof(long));
+    for(int & step : steps)
+        rl_outfile.write((char*)&step, sizeof(int)); 
     for(auto & ranks : rank_loads){ 
         long numranks = ranks.size(); 
         rl_outfile.write((char*)&numranks, sizeof(long));
@@ -146,6 +148,7 @@ nyx_main (int argc, char* argv[])
 
     BL_PROFILE_VAR_NS("nyx_main::LoadBalanceProfiling()", loadBalanceProfiling);
     std::vector<amrex::Vector<long>> rank_loads; //ACJ
+    std::vector<int> rl_steps;
     amrex::ParmParse ppn("nyx"); //ACJ
     int loadBalanceInt = 100, checkInt = 100, dualGridProfileFreq=1; //ACJ
     amrex::Real loadBalanceStartZ = 199; //ACJ
@@ -207,11 +210,11 @@ nyx_main (int argc, char* argv[])
                         rankload[proc] += gridloads[boxid];
                     }
                     rank_loads.push_back(rankload); 
-                    
+                    rl_steps.push_back(current_step);
                     //if output time-step, output current rank_loads
                     //if(amrptr->levelSteps(0)%loadBalanceInt == 0) and (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
                     if(current_step%checkInt==0 or current_step%loadBalanceInt==0){ //write output whenever we write a checkpoint
-                        write_rank_loads(Nyx::dual_grid_load_balance, rank_loads);
+                        write_rank_loads(Nyx::dual_grid_load_balance, rank_loads, rl_steps);
                     }
                 }
                 BL_PROFILE_VAR_STOP(loadBalanceProfiling);
@@ -227,7 +230,7 @@ nyx_main (int argc, char* argv[])
 
     //ACJ
     if (ParallelDescriptor::IOProcessor())
-        write_rank_loads(Nyx::dual_grid_load_balance, rank_loads); 
+        write_rank_loads(Nyx::dual_grid_load_balance, rank_loads, rl_steps); 
     //ACJ
 
     const Real time_without_init = ParallelDescriptor::second() - time_before_main_loop;
