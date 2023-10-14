@@ -191,28 +191,31 @@ nyx_main (int argc, char* argv[])
          
             //ACJ
             int current_step  = amrptr->levelSteps(0);
-            if(ParallelDescriptor::IOProcessor() and (current_step%dualGridProfileFreq==0 or current_step%loadBalanceInt==0 ))
+            if(current_step%dualGridProfileFreq==0 or current_step%loadBalanceInt==0)
             {
                 BL_PROFILE_VAR_START(loadBalanceProfiling);
                 int level_acj = 0;
                 amrex::Vector<long> gridloads = Nyx::theDMPC()->NumberOfParticlesInGrid(level_acj, true, false);   
                 amrex::Vector<long> rankload(ParallelDescriptor::NProcs(), 0); //ACJ should be vector of processors for each boxid
-
-                //get current rank load (do this every time step)
-                int numboxes = Nyx::theDMPC()->ParticleDistributionMap(level_acj).size(); 
-                for (int boxid=0; boxid < numboxes; boxid++){ 
-                    int proc = Nyx::theDMPC()->ParticleDistributionMap(level_acj)[boxid];
-                    rankload[proc] += gridloads[boxid];
-                }
-                rank_loads.push_back(rankload); 
                 
-                //if output time-step, output current rank_loads
-                //if(amrptr->levelSteps(0)%loadBalanceInt == 0) and (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
-                if(current_step%checkInt==0 or current_step%loadBalanceInt==0){ //write output whenever we write a checkpoint
-                    write_rank_loads(Nyx::dual_grid_load_balance, rank_loads);
+                if(ParallelDescriptor::IOProcessor())
+                {
+                    //get current rank load (do this every time step)
+                    int numboxes = Nyx::theDMPC()->ParticleDistributionMap(level_acj).size(); 
+                    for (int boxid=0; boxid < numboxes; boxid++){ 
+                        int proc = Nyx::theDMPC()->ParticleDistributionMap(level_acj)[boxid];
+                        rankload[proc] += gridloads[boxid];
+                    }
+                    rank_loads.push_back(rankload); 
+                    
+                    //if output time-step, output current rank_loads
+                    //if(amrptr->levelSteps(0)%loadBalanceInt == 0) and (Nyx::new_a >= 1.0/(loadBalanceStartZ + 1.0)))
+                    if(current_step%checkInt==0 or current_step%loadBalanceInt==0){ //write output whenever we write a checkpoint
+                        write_rank_loads(Nyx::dual_grid_load_balance, rank_loads);
+                    }
                 }
                 BL_PROFILE_VAR_STOP(loadBalanceProfiling);
-                if(current_step%checkInt==0 or current_step%loadBalanceInt==0){
+                if(ParallelDescriptor::IOProcessor() and (current_step%checkInt==0 or current_step%loadBalanceInt==0)){
                     amrex::Print()<<"STEP: "<<current_step<<", Tiny Profiling Output:"<<std::endl;
                     BL_PROFILE_TINY_FLUSH();
                 }

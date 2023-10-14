@@ -91,11 +91,7 @@ AMREX_FORCE_INLINE AMREX_GPU_HOST_DEVICE void ion_n_device(AtomicRates* atomic_r
     fhi = tmp - j;
     flo = 1.0e0 - fhi;
     j = j + 1; // F90 arrays start with 1, using Array1D<Real,1,size>
-    
-    if(j<0 or j+1>NCOOLTAB){
-    std::cout<<amrex::ParallelDescriptor::MyProc()<<"| j: "<<j<<std::endl;
-    std::cout<<amrex::ParallelDescriptor::MyProc()<<"| logT: "<<logT<<", min:"<<TCOOLMIN<<", max:"<<TCOOLMAX<<std::endl;
-    }
+     
     ahp   = flo*atomic_rates->AlphaHp  (j) + fhi*atomic_rates->AlphaHp  (j+1);
     ahep  = flo*atomic_rates->AlphaHep (j) + fhi*atomic_rates->AlphaHep (j+1);
     ahepp = flo*atomic_rates->AlphaHepp(j) + fhi*atomic_rates->AlphaHepp(j+1);
