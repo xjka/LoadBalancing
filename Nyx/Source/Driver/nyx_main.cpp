@@ -218,10 +218,10 @@ nyx_main (int argc, char* argv[])
                     }
                 }
                 BL_PROFILE_VAR_STOP(loadBalanceProfiling);
-                if(current_step%checkInt==0){
-                    amrex::Print()<<"STEP: "<<current_step<<", Tiny Profiling Output:"<<std::endl;
-                    BL_PROFILE_TINY_FLUSH();
-                }
+                //if(current_step%checkInt==0){
+                //    amrex::Print()<<"STEP: "<<current_step<<", Tiny Profiling Output:"<<std::endl;
+                    //BL_PROFILE_TINY_FLUSH();
+                //}
             }
             //ACJ
 
