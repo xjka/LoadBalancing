@@ -357,11 +357,15 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(int o_box_id, int np_ta
 //ACJ
 
 //ACJ
+// This function gets the list of "overloaded" and "underloaded" ranks and returns them (through editing inputs.)
 void get_over_under_load_ranks(Vector<int>& underload_ranks, Vector<int>& overload_ranks, const Vector<int>& pcount_rank, 
         Vector<BidNp>& o_q, Vector<BidNp>& u_q, const int& o_toler_np, const int& u_toler_np)
 {
     //do underload ranks
-    if(underload_ranks.size()>0){
+    //If there are underload ranks this is not the first function call during
+    //this execution of the algorithm in which case we do not want to reconsider
+    //all ranks, as this could cause the algorithm to not terminate due to flip-flopping. 
+    if(underload_ranks.size()>0){  
         Vector<int> tmp_underload_ranks;
         for(int u_rnk : underload_ranks){
             if(pcount_rank[u_rnk] < u_toler_np)
@@ -399,6 +403,7 @@ void get_over_under_load_ranks(Vector<int>& underload_ranks, Vector<int>& overlo
 
 //Simple function testing whether the calling rank is BOTH an overload rank AND has an available underload rank to 
 //unload into. If both aren't true wait to execute.
+//This function also does necessary updating to: o_rank, o_rank_np, u_rank and u_rank_np.
 bool should_execute(const Vector<BidNp> & o_q, const Vector<BidNp>& u_q, int& o_rank, 
         int& o_rank_np, int& u_rank, int& u_rank_np, bool& am_overload_rank)
 {
@@ -532,15 +537,16 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
             o_box_list.sort(PairCompare(true));  //sort in descending order
              
             //TODO: could add more intelligence to matching over and underload ranks
-            //get number of particles this rank needs to remove
+            //get the number of particles to remove, and the space available
             int num_2_rmv = o_rank_np - o_toler_np;
             int room = avg_np - u_rank_np;
             while(num_2_rmv>0  && room>0)
             { 
-                //get the space available and num of particles we will attempt to remove
+
+                //get the number of particles we will (can) remove
                 int num_do_rmv = std::min(room, num_2_rmv);
-                
-                //Reduce load as much as possible by simply sending as many boxes as possible to underload rank
+ 
+                ///// Reduce load as much as possible by simply sending as many boxes as possible to underload rank /////
                 auto it = o_box_list.begin();
                 while(num_do_rmv>0 && it!=o_box_list.end())
                 {
@@ -561,8 +567,9 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                     else
                         it++;
                 }
-               
-                if(num_do_rmv>0) //need to split
+
+                ///// if there are still particles to remove, need to split a box/////
+                if(num_do_rmv>0) 
                 {
                     //choose the biggest box 
                     int o_box_id = o_box_list.front().first;
@@ -617,7 +624,6 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                         break; //break to re-asses underload ranks in case this one is close to full
                     }
                 }
-                
                 //update count of room available in this underload rank
                 room = avg_np - u_rank_np;
                 

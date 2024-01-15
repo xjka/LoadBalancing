@@ -38,7 +38,7 @@ gravity.mlmg_consolidation=1
 nyx.reuse_mlpoisson = 1
 
 nyx.initial_z = 159.0
-nyx.final_z = 0.5
+nyx.final_z = 130 #0.5
 
 #File written during the run: nstep | time | dt | redshift | a
 amr.data_log = runlog
@@ -46,7 +46,7 @@ amr.data_log = runlog
 
 #This is how we restart from a checkpoint and write an ascii particle file
 #Leave this commented out in cvs version
-amr.restart = chk00316
+#amr.restart = chk00316
 #max_step = 4
 #particles.particle_output_file = particle_output
 
@@ -139,13 +139,13 @@ amr.density.field_name = denvol
 # CHECKPOINT FILES
 amr.checkpoint_files_output = 1
 amr.check_file        = chk
-amr.check_int         = 4
+amr.check_int         = 100
 amr.checkpoint_nfiles = 64
 
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file       = plt
-amr.plot_int        = 4
+amr.plot_int        = 100
 #nyx.plot_z_values   = 7.0 6.0 5.0 4.0 3.0 2.0
 
 amr.plot_vars        = density xmom ymom zmom rho_e Temp phi_grav
