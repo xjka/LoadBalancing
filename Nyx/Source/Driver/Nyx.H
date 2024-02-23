@@ -70,12 +70,6 @@ static constexpr int max_prob_param = 20;
 #endif
 
 
-
-//ACJ
-//#include <unistd.h>
-//void gdb_attach_point(void);
-//ACJ
-
 //
 // AmrLevel-derived class for hyperbolic conservation equations for stellar
 // media
@@ -811,10 +805,10 @@ int integrate_state_struct
     virtual void CreateLevelDirectory (const std::string &dir) override;
     
     static bool dual_grid_load_balance;  //ACJ
-    static amrex::Real overload_toler;  //ACJ
-    static amrex::Real underload_toler; //ACJ  
+    static amrex::Real overload_toler;  //ACJ 
     static int dual_grid_profile_freq; //ACJ
-
+    static int min_grid_size; //ACJ
+                              
 protected:
 
     static void read_params();

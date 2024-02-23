@@ -393,7 +393,6 @@ Nyx::init_particles ()
         BL_ASSERT (DMPC == 0);
         
           DMPC = new DarkMatterParticleContainer(parent); 
-          DMPC->setGreedyRegrid(); //ACJ
 
         ActiveParticles.push_back(DMPC); 
 
@@ -961,8 +960,6 @@ Nyx::particle_post_restart (const std::string& restart_file, bool is_checkpoint)
         {
             DMPC->WriteAsciiFile(dm_particle_output_file);
         }
-
-        DMPC->setGreedyRegrid(); //ACJ
     }
 #ifdef AGN
     {

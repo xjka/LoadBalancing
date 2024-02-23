@@ -41,23 +41,6 @@ using std::string;
 #include <agn_F.H>
 #endif
 
-//ACJ
-/*void gdb_attach_point(void)
-{
-    volatile int gdb = 0;
-    char hostname[256];
-    gethostname(hostname, sizeof(hostname));
-    printf("rank %d PID %d on %s ready for attach\n", ParallelDescriptor::MyProc(), getpid(), hostname);
-    fflush(stdout);
-    if(ParallelDescriptor::MyProc()==0){
-        while (0 == gdb){
-            usleep(1000);
-        }
-    }
-    ParallelDescriptor::Barrier(MPI_COMM_WORLD);   
-}*/
-//ACJ
-
 using namespace amrex;
 
 extern "C" {
@@ -94,8 +77,8 @@ int Nyx::load_balance_strategy = DistributionMapping::SFC;
 
 bool Nyx::dual_grid_load_balance = false; //ACJ
 Real Nyx::overload_toler = 1.2; //ACJ
-Real Nyx::underload_toler = 0.8; //ACJ
 int Nyx::dual_grid_profile_freq = 1; //ACJ
+int Nyx::min_grid_size = 1; //ACJ
 
 bool Nyx::dump_old = false;
 int Nyx::verbose      = 0;
@@ -441,8 +424,8 @@ Nyx::read_params ()
 
     pp_nyx.query("dual_grid_load_balance", dual_grid_load_balance); //ACJ
     pp_nyx.query("overload_toler", overload_toler); //ACJ
-    pp_nyx.query("underload_toler", underload_toler); //ACJ
     pp_nyx.query("dual_grid_profile_freq", dual_grid_profile_freq); //ACJ
+    pp_nyx.query("min_grid_size" , min_grid_size); //ACJ
 
     std::string theStrategy;
 
@@ -1819,13 +1802,10 @@ Nyx::postCoarseTimeStep (Real cumtime)
             //ACJ
             if(dual_grid_load_balance)
             {
-              //Accept fact that this is done only for DMPC for now (instead of also including AGN, etc.)
               theDMPC()->Redistribute(); //to make sure particles are over the proper grids
-              //theDMPC()->partitionParticleGrids(lev, parent->boxArray(lev), parent->DistributionMap(lev),
-                                         //overload_toler, underload_toler); //the box array and distribution map are supposed to be those of the fluid
-              theDMPC()->load_balance(lev, parent->boxArray(lev), parent->DistributionMap(lev), overload_toler, underload_toler, ba, dm);
-              //dm = theDMPC()->ParticleDistributionMap(lev);
-        
+              //theDMPC()->load_balance(lev, overload_toler, min_grid_size, ba, dm);
+              theDMPC()->load_balance(lev, parent->boxArray(lev), parent->DistributionMap(lev), 
+                                          overload_toler, min_grid_size, ba, dm);              
             }
             else
             {
@@ -1877,7 +1857,7 @@ Nyx::postCoarseTimeStep (Real cumtime)
             //ACJ
             amrex::BoxArray newboxarray;
             if(dual_grid_load_balance)
-                newboxarray = ba; //theDMPC()->ParticleBoxArray(lev);
+                newboxarray = ba; 
             else
                 newboxarray = parent->boxArray(lev);
             //ACJ
