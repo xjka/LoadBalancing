@@ -528,7 +528,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                             Vector<Box> tmp_new_boxes;
                             for(Box &b : new_boxes){
                                 if (hi[dir]-lo[dir] >= 2*min_grid_size)
-                                    tmp_new_boxes.push_back(b.chop(dir, int(lo[dir]+std::ceil((hi[dir]-lo[dir])/2.0)) ));
+                                    tmp_new_boxes.push_back(b.chop(dir, lo[dir]+std::ceil((hi[dir]-lo[dir])/2.0)));
                             }
                             new_boxes.insert(new_boxes.end(), tmp_new_boxes.begin(), tmp_new_boxes.end());
                         }
@@ -562,14 +562,14 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
                             //or less space, and the space in this one won't change by running the loop again. So just need to 
                             //drop this box. 
                             if(pcount_rank_diff[u_rank]==0){ 
-                                num_2_rmv -= o_box_list.front().np; 
-                                pcount_rank_diff[o_rank] -= o_box_list.front().np;
+                                num_2_rmv -= o_box_np; 
+                                pcount_rank_diff[o_rank] -= o_box_np;
                                 o_box_list.pop_front();
                             }
                             break; //break to re-asses underload ranks in case this one is close to full
                         }
-                    }
-                }
+                    } 
+                } //end if(num_do_rmv>0)
                 //update count of room available in this underload rank
                 room = avg_np - u_rank_np;            
             }  //end while(num_2_rmv_>0 && room>0)

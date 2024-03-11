@@ -203,7 +203,7 @@ nyx_main (int argc, char* argv[])
                     
                     if(ParallelDescriptor::IOProcessor())
                     {
-                        //get current rank load (do this every time step)
+                        //get current rank load
                         int numboxes = Nyx::theDMPC()->ParticleDistributionMap(level_acj).size(); 
                         for (int boxid=0; boxid < numboxes; boxid++){ 
                             int proc = Nyx::theDMPC()->ParticleDistributionMap(level_acj)[boxid];

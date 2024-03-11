@@ -5,9 +5,7 @@ nyx.dual_grid = 1
 nyx.overload_toler = 1.2
 nyx.underload_toler = 0.8
   
-nyx.greedy_3d = 0
-nyx.greedy_dir = 0
-nyx.greedy_min_grid_size = 2
+nyx.min_grid_size = 2
 
 # ------------------  INPUTS TO MAIN PROGRAM  -------------------
 max_step = 10000000
