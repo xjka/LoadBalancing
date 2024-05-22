@@ -1,0 +1,37 @@
+Source/Particle/NeutrinoParticleContainer.cpp:            MultiFab::ParallelCopy(*mf_to_be_filled[0],*mf[0],0,0,ncomp,0,0);
+Source/Particle/NeutrinoParticleContainer.cpp:            MultiFab::ParallelCopy(*mf_to_be_filled[lev],*mf_part[lev],0,0,1,0,0);
+Source/Particle/NeutrinoParticleContainer.cpp:        MultiFab::ParallelCopy(mf_to_be_filled,*mf_pointer,0,0,ncomp,0,0);
+Source/Particle/AGNParticleContainer.cpp:            //ACJ don't copy ghosts with ParallelCopy
+Source/Particle/AGNParticleContainer.cpp:            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0); //ng,ng);
+Source/Particle/DarkMatterParticleContainer.cpp:    //np_mf_f.ParallelCopy(np_mf_p);
+Source/Particle/DarkMatterParticleContainer.cpp:    np_mf_f.ParallelCopy(np_mf_p);
+Source/Particle/DarkMatterParticleContainer.cpp:            //ACJ :don't copy ghosts in ParallelCopy (they will overwrite valid cells.)
+Source/Particle/DarkMatterParticleContainer.cpp:            //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(), ng,ng);
+Source/Particle/DarkMatterParticleContainer.cpp:            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
+Source/Particle/DarkMatterParticleContainer.cpp:            //ACJ: don't copy ghosts using ParallelCopy
+Source/Particle/DarkMatterParticleContainer.cpp:            //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
+Source/Particle/DarkMatterParticleContainer.cpp:            ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
+Source/Particle/NyxParticleContainer.H:            //ACJ don't try to copy ghosts using ParallelCopy (will copy any garbage ghost values over valid cells)). 
+Source/Particle/NyxParticleContainer.H:            //ac_pointer->ParallelCopy(acceleration,0,0,AMREX_SPACEDIM, acceleration.nGrowVect(),acceleration.nGrowVect());
+Source/Particle/NyxParticleContainer.H:            ac_pointer->ParallelCopy(acceleration,0,0,AMREX_SPACEDIM, 0,0);
+Source/Initialization/Nyx_initdata.cpp:    zhi.ParallelCopy(zhi_from_file, geom.periodicity());
+Source/Initialization/Nyx_initdata.cpp:        S_new_crse.MultiFab::ParallelCopy(mf, 0, 0, 6, 0, 0);
+Source/Initialization/Nyx_initdata.cpp:        S_new_crse.MultiFab::ParallelCopy(mf, 0, FirstSpec_comp, 1, 0, 0);
+Source/Initialization/Nyx_initcosmo.cpp:    mf.MultiFab::ParallelCopy(mf_read,0,0,nc,0,0);
+Source/Initialization/Nyx_initcosmo.cpp:    S_new.MultiFab::ParallelCopy(nuMf, nu_den, NuDens, 1, 0, 0);
+Source/Initialization/Nyx_initcosmo.cpp:    S_new.MultiFab::ParallelCopy(nuMf, nu_vx,  NuXMom, 3, 0, 0);
+Source/Initialization/Nyx_initcosmo.cpp:	S_new.MultiFab::ParallelCopy(mf, baryon_den, Density_comp, 1, 0, 0);
+Source/Initialization/Nyx_initcosmo.cpp:        S_new.MultiFab::ParallelCopy(mf, baryon_vx, Xmom_comp, 3, 0, 0);
+Source/Gravity/Gravity.cpp:        grad_phi[level][n]->MultiFab::ParallelCopy(*crse_gphi_fine[n], cgeom.periodicity());
+Source/DerivedQuantities/ParticleDerive.cpp:            dat.MultiFab::ParallelCopy(ctemp_dat, 0, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 0, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 1, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 2, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 3, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 0, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 0, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 1, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 2, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 3, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 0, 0, 1, 0, 0);
+Source/DerivedQuantities/ParticleDerive.cpp:        derive_dat->ParallelCopy(*particle_mf[level], 0, 0, 1, 0, 0);

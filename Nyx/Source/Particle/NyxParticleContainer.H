@@ -6,7 +6,6 @@
 #include <AMReX_NeighborParticles.H>
 #include <AMReX_AmrParticles.H>
 
-
 class NyxParticleContainerBase
 {
 public:
@@ -38,8 +37,8 @@ public:
     virtual void RemoveParticlesAtLevel (int level) = 0;
     virtual amrex::Real sumParticleMass (int level) const = 0;
     virtual void Regrid  (const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba, const int lev) = 0;
-    //  void RegridHat (const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba, const int lev);
-    virtual amrex::Vector<long> NumberOfParticlesInGrid (int lev, bool only_valid, bool only_local) = 0;
+  //  void RegridHat (const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba, const int lev);
+  virtual amrex::Vector<long> NumberOfParticlesInGrid (int lev, bool only_valid, bool only_local) = 0;
 
     virtual void AssignDensitySingleLevel (amrex::MultiFab& mf, int level, int ncomp=1,
                                            int particle_lvl_offset = 0) const = 0;
@@ -56,17 +55,12 @@ public:
 
     using ParticleTileType = amrex::ParticleTile<amrex::Particle<NSR,NSI>,NAR,NAI>;
     using MyParIter = amrex::ParIter<NSR,NSI,NAR,NAI>;
-    using MyConstParIter = amrex::ParConstIter<NSR,NSI,NAR,NAI>; 
+    using MyConstParIter = amrex::ParConstIter<NSR,NSI,NAR,NAI>;
 
     NyxParticleContainer (amrex::Amr* amr, int nghost=0)
         : amrex::NeighborParticleContainer<NSR,NSI>((amrex::ParGDBBase*) amr->GetParGDB(), nghost),
           sub_cycle(amr->subCycle())
     {}
-
-    //ACJ
-    //NyxParticleContainer(const amrex::Geometry& geom, const amrex::DistributionMapping& dmap, const amrex::BoxArray& ba) 
-    //     :  amrex::NeighborParticleContainer<NSR,NSI>(geom, dmap, ba, 1) {} 
-    //ACJ
 
     virtual ~NyxParticleContainer () {}
 
@@ -291,7 +285,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::sumParticleMomentum (int          lev,
 
     const ParticleLevel& pmap = this->GetParticles(lev);
 
-    D_TERM(mom[0] = 0;, mom[1] = 0;, mom[2] = 0;);
+    AMREX_D_TERM(mom[0] = 0;, mom[1] = 0;, mom[2] = 0;);
 
     for (typename ParticleLevel::const_iterator pmap_it = pmap.begin(), pmapEnd = pmap.end(); pmap_it != pmapEnd; ++pmap_it)
     {
@@ -309,13 +303,13 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::sumParticleMomentum (int          lev,
 
             if (p.id() > 0)
             {
-                D_TERM(mom_0 += p.rdata(0) * p.rdata(1);,
-                       mom_1 += p.rdata(0) * p.rdata(2);,
-                       mom_2 += p.rdata(0) * p.rdata(3););
+                AMREX_D_TERM(mom_0 += p.rdata(0) * p.rdata(1);,
+                             mom_1 += p.rdata(0) * p.rdata(2);,
+                             mom_2 += p.rdata(0) * p.rdata(3););
             }
         }
 
-        D_TERM(mom[0] += mom_0;, mom[1] += mom_1;, mom[2] += mom_2;);
+        AMREX_D_TERM(mom[0] += mom_0;, mom[1] += mom_1;, mom[2] += mom_2;);
     }
 
     amrex::ParallelDescriptor::ReduceRealSum(mom,AMREX_SPACEDIM);
@@ -330,19 +324,15 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
     return estTimestep(acceleration,1.0,lev,cfl);
 }
 
-
-
-
-
 template <int NSR,int NSI,int NAR,int NAI>
 amrex::Real
 NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       acceleration,
                                                     amrex::Real            a,
                                                     int                    lev,
                                                     amrex::Real            cfl) const
-{  
+{
     BL_PROFILE("NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep(lev)");
-    amrex::Real dt = 1e50;
+    amrex::Real            dt               = 1e50;
     BL_ASSERT(NSR >= AMREX_SPACEDIM+1);
     BL_ASSERT(lev >= 0);
 
@@ -350,6 +340,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
         return dt;
 
     const amrex::Real      strttime         = amrex::ParallelDescriptor::second();
+
     const amrex::Geometry& geom             = this->m_gdb->Geom(lev);
     const amrex::IntVect   base             = geom.Domain().smallEnd();
     const auto             dxi              = geom.InvCellSizeArray();
@@ -363,8 +354,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
     {
         ac_pointer.reset(new amrex::MultiFab(this->m_gdb->ParticleBoxArray(lev),
                                              this->m_gdb->ParticleDistributionMap(lev),
-                                             acceleration.nComp(), acceleration.nGrow())); 
-           
+                                             acceleration.nComp(), acceleration.nGrow()));
         if(acceleration.boxArray() == ac_pointer->boxArray())//this->finestLevel() == 0)
         {
             ac_pointer->Redistribute(acceleration,0,0,AMREX_SPACEDIM,acceleration.nGrowVect());
@@ -380,7 +370,6 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
         }
     }
 
-
 #ifdef _OPENMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion()) reduction(min:dt)
 #endif
@@ -390,13 +379,13 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
       using ReduceTuple = typename decltype(reduce_data)::Type;
 
         for (MyConstParIter pti(*this, lev); pti.isValid(); ++pti) {
-            const int              grid = pti.index();
-            const AoS&             pbox = pti.GetArrayOfStructs();
+            const int grid = pti.index();
+            const AoS&       pbox = pti.GetArrayOfStructs();
             const ParticleType* pstruct = pbox().data();
-            const int                 n = pbox.size();
+            const int        n    = pbox.size();
 
-            const auto gfab = (ac_pointer) ? (*ac_pointer).array(grid) : acceleration.array(grid); 
-            
+            const auto gfab = (ac_pointer) ? (*ac_pointer).array(grid) : acceleration.array(grid);
+
             num_particles_at_level += n;
 
                 reduce_op.eval(n, reduce_data,
@@ -405,6 +394,7 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
 
                 if (p.id() > 0)
                 {
+
                     amrex::IntVect cell;
                     cell[0]= static_cast<int>(amrex::Math::floor((p.pos(0)-plo[0])*dxi[0]));
                     cell[1]= static_cast<int>(amrex::Math::floor((p.pos(1)-plo[1])*dxi[1]));
@@ -422,22 +412,21 @@ NyxParticleContainer<NSR,NSI,NAR,NAI>::estTimestep (amrex::MultiFab&       accel
                     const amrex::Real aval_y = gfab(cell[0],cell[1],cell[2],1);
                     const amrex::Real aval_z = gfab(cell[0],cell[1],cell[2],2);
                     const amrex::Real mag_accel = std::sqrt(aval_x*aval_x+aval_y*aval_y+aval_z*aval_z);
-                   
+
                     if (mag_accel > 0) {
                         dt_part = amrex::min( dt_part, 1/std::sqrt(mag_accel*dxi[0]) );
                     }
-                    
+
                     return dt_part;
                 }
 
                 return 1e50;
             });
-
         }
-        
+
         ReduceTuple hv = reduce_data.value();
         amrex::Real ldt_cpu = amrex::get<0>(hv);
-          
+
         dt = std::min(dt,ldt_cpu);
     }
 

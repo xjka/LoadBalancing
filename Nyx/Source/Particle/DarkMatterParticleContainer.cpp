@@ -1,6 +1,19 @@
 #include <stdint.h>
+
 #include <DarkMatterParticleContainer.H>
 
+
+void gdb_attach_point(int myrank)
+{
+    volatile int gdb_i = 0;
+    char hostname[256];
+    gethostname(hostname, sizeof(hostname));
+    std::cout<<"PID "<<getpid()<<" on "<< hostname<<" ready for attach (rank:"<<myrank<<")\n";
+    if (myrank==0)
+        while (0 == gdb_i)
+            sleep(5);
+   MPI_Barrier(MPI_COMM_WORLD);
+}
 
 using namespace amrex;
 
@@ -72,8 +85,6 @@ namespace {
 
 }
 
-
-
 //ACJ
 namespace {
   
@@ -111,7 +122,7 @@ long DarkMatterParticleContainer::countParticle(int lev, iMultiFab& np_mf)
   MultiFab mf_temp(np_mf.boxArray(), np_mf.DistributionMap(), 1, 0); 
   mf_temp.setVal(0.);
   //put the particle counts in mf_temp and return total number of particles
-  int numparticle = IncrementWithTotal(mf_temp, lev, false);    
+  long numparticle = IncrementWithTotal(mf_temp, lev, false);    
   //copy the values of mf_temp int np_mf
   //Copy (FabArray<DFAB>& dst, FabArray<SFAB> const& src, int srccomp, int dstcomp, int numcomp, int nghost)
   Copy(np_mf, mf_temp, 0, 0, 1, 0);
@@ -157,7 +168,7 @@ Box DarkMatterParticleContainer::chop_and_distribute_box(Box &remain, const Box 
         // find the chop position with the closest np to np_target
         int chop_idx[2] = {-1,-1};
         while (chop_pos >= chop_lo and (chop_idx[0]==-1 or chop_idx[1]==-1)) {
-            int np_slice = 0;
+            int np_slice = 0; 
             for (int idir0=remain.smallEnd(dir0); idir0<=remain.bigEnd(dir0); ++idir0) {
                 for (int idir1=remain.smallEnd(dir1); idir1<=remain.bigEnd(dir1); ++idir1) {
                     // the index is based on the offset to the lower bound of the original box
@@ -353,6 +364,9 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
         amrex::Real overload_toler, int min_grid_size, amrex::BoxArray &new_ba, 
         amrex::DistributionMapping &new_dm)
 {
+
+    //gdb_attach_point(ParallelDescriptor::MyProc());
+
     BL_PROFILE("DarkMatterParticleContainer::load_balance()"); 
     // parent grid info
     //const amrex::BoxArray&            fba      = ParticleBoxArray(lev);
@@ -373,7 +387,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
 
     // count particles in grid
     Vector<int> pcount_fbox(fba.size(),0);//this is fluid grid in this case
-     for (MyParIter pti(*this, lev); pti.isValid(); ++pti) {
+    for (MyParIter pti(*this, lev); pti.isValid(); ++pti) {
         int fboxid = m_pboxid_to_fboxid[pti.index()];
         pcount_fbox[fboxid] += pti.numParticles();
     }
@@ -407,11 +421,12 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
     int  u_toler_np = static_cast<int>(avg_np); //make any rank below average a potential underloaded rank
 
     // debug
-    Print() << "avg np: "              << avg_np
-          << " overload tolerance "  << overload_toler << "\n";
+    Print() <<"total num particles: "<< m_total_numparticle << "\n"
+           << "avg np:              "<< avg_np << "\n"
+           << "overload tolerance:  "<< overload_toler << "\n";
 
     //now actually start the redivisioning algorithm
-    amrex::Print()<<"starting 3D load_balance algorithm (N_box="<<FBL_VEC_SIZE0<<")--->"<<std::flush;
+    Print()<<"starting 3D load_balance algorithm (N_box="<<FBL_VEC_SIZE0<<")--->"<<std::flush;
 
     //new box->processor map
     Vector<int> m_pboxid_to_fboxid_chngs(m_pboxid_to_fboxid);
@@ -673,6 +688,7 @@ DarkMatterParticleContainer::load_balance(int lev, const amrex::BoxArray& fba, c
 //ACJ
 
 
+
 void
 DarkMatterParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
                                             int                    lev,
@@ -686,7 +702,7 @@ DarkMatterParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
     //If there are no particles at this level
     if (lev >= this->GetParticles().size())
         return;
-    const auto dxi = Geom(lev).InvCellSizeArray();
+    const auto dxi              = Geom(lev).InvCellSizeArray();
 
     amrex::MultiFab* ac_ptr;
     if (this->OnSameGrids(lev, acceleration))
@@ -711,7 +727,7 @@ DarkMatterParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
             //Instead copy cells and then fill ghosts afterwards.
             //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(), ng,ng);
             ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
-            ac_ptr->FillBoundary(); 
+            ac_ptr->FillBoundary();
         }
     }
 
@@ -747,40 +763,39 @@ DarkMatterParticleContainer::moveKickDrift (amrex::MultiFab&       acceleration,
     ParticleLevel&    pmap          = this->GetParticles(lev);
     if (lev > 0 && sub_cycle)
     {
+	if (! m_particle_locator.isValid(GetParGDB())) m_particle_locator.build(GetParGDB());
+        m_particle_locator.setGeometry(GetParGDB());
+        AmrAssignGrid<DenseBinIteratorFactory<Box>> assign_grid = m_particle_locator.getGridAssignor();
+
         amrex::ParticleLocData pld; 
         for (auto& kv : pmap) {
-            AoS&  pbox       = kv.second.GetArrayOfStructs();
-            const int   n    = pbox.size();
-
-#ifdef _OPENMP
-#pragma omp parallel for private(pld) if (Gpu::notInLaunchRegion())
-#endif
-            for (int i = 0; i < n; i++)
-            {
-                ParticleType& p = pbox[i];
-                if (p.id() <= 0) continue;
-
-                // Move the particle to the proper ghost cell. 
-                //      and remove any *ghost* particles that have gone too far
-                // Note that this should only negate ghost particles, not real particles.
-                if (!this->Where(p, pld, lev, lev, where_width))
-                {
-                    // Assert that the particle being removed is a ghost particle;
-                    // the ghost particle is no longer in relevant ghost cells for this grid.
-                    if (p.id() == amrex::GhostParticleID)
-                    {
-                        p.id() = -1;
-                    }
-                    else
-                    {       
-                        int grid = kv.first.first;
-                        
-                        
-                        std::cout << "Oops -- removing particle " << p << " " << this->Index(p, lev) << " " << lev << " " << (this->m_gdb->ParticleBoxArray(lev))[grid] << " " << where_width << std::endl;
-                        amrex::Error("Trying to get rid of a non-ghost particle in moveKickDrift");
-                    }
-                }
-            }
+            AoS&  particles = kv.second.GetArrayOfStructs();
+            ParticleType* pstruct = particles().data();
+            const long np = particles.size();
+            amrex::ParallelFor(np,
+                           [=] AMREX_GPU_HOST_DEVICE ( long i)
+                           {
+                               //                              amrex::ParticleContainer<4, 0>::SuperParticleType&  p=pstruct[i];
+                               auto&  p=pstruct[i];
+			       if(p.id()>0) {
+                               const auto tup = assign_grid(p, lev, lev, where_width);
+                               auto p_boxes = amrex::get<0>(tup);
+                               auto p_levs  = amrex::get<1>(tup);
+                               if(p_boxes<0||p_levs<0) {
+                                   //printf("p:       %d\t%d\t%g %g %g %g %g %g %g id\n",p.id(),p.cpu(),p.pos(0),p.pos(1),p.pos(2),p.rdata(0),p.rdata(1),p.rdata(2),p.rdata(3));
+                                   //printf("tup:     %d\t%d\n",amrex::get<0>(tup),amrex::get<1>(tup));
+                                   if (p.id() == amrex::GhostParticleID)
+                                   {
+                                       p.id() = -1;
+                                   }
+                                   else
+                                   {
+                                       amrex::Error("Trying to get rid of a non-ghost particle in moveKickDrift");
+                                   }
+                               }
+			       }
+                           });
+            Gpu::streamSynchronize();
         }
     }
 }
@@ -814,12 +829,12 @@ DarkMatterParticleContainer::moveKick (MultiFab&       acceleration,
             ac_ptr->FillBoundary();
         }
         else
-        {   
+        {
             //ACJ: don't copy ghosts using ParallelCopy
             //instead just copy all valid cells and then fill ghosts 
             //ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),ng,ng);
             ac_ptr->ParallelCopy(acceleration,0,0,acceleration.nComp(),0,0);
-            ac_ptr->FillBoundary(); 
+            ac_ptr->FillBoundary();
         }
     }
 
@@ -942,7 +957,7 @@ DarkMatterParticleContainer::InitCosmo1ppcMultiLevel(
     Real         disp[AMREX_SPACEDIM];
     Real         vel[AMREX_SPACEDIM];
     
-    Real        mean_disp[AMREX_SPACEDIM]={D_DECL(0,0,0)};
+    Real        mean_disp[AMREX_SPACEDIM]={AMREX_D_DECL(0,0,0)};
 
 
     //
@@ -968,7 +983,7 @@ DarkMatterParticleContainer::InitCosmo1ppcMultiLevel(
             {
                 for (int ix = fab_lo[0]; ix <= fab_hi[0]; ix++)
                 {
-                    IntVect indices(D_DECL(ix, jx, kx));
+                    IntVect indices(AMREX_D_DECL(ix, jx, kx));
                     totalcount++;
                     if (baWhereNot.contains(indices)) 
                     {

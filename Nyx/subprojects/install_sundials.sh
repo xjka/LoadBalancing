@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 #module load PrgEnv-gnu cudatoolkit cmake cpe-cuda gcc
+rm -rf sundials/
 git clone https://github.com/LLNL/sundials.git
 cd sundials
 mkdir builddir instdir
@@ -18,9 +19,9 @@ cmake \
 -DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG" \
 -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG"  \
 -DCUDA_ENABLE=OFF  \
--DMPI_ENABLE=OFF  \
+-DMPI_ENABLE=ON  \
 -DOPENMP_ENABLE=ON   \
 -DF2003_INTERFACE_ENABLE=OFF   \
--DSUNDIALS_INDEX_SIZE:INT=32 ../
+-DSUNDIALS_INDEX_SIZE:INT=32 ../ #-DSUNDIALS_BUILD_PACKAGE_FUSED_KERNELS=OFF\
 make -j8
 make install -j8

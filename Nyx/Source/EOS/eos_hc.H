@@ -73,7 +73,7 @@ AMREX_FORCE_INLINE AMREX_GPU_HOST_DEVICE void ion_n_device(AtomicRates* atomic_r
     t  = gamma_minus_1*MPROTON/BOLTZMANN * U * mu;
 
     logT = std::log10(t);
-    
+
     if (logT >= TCOOLMAX) // Fully ionized plasma
     {
         nhp   = 1.0e0;
@@ -91,7 +91,7 @@ AMREX_FORCE_INLINE AMREX_GPU_HOST_DEVICE void ion_n_device(AtomicRates* atomic_r
     fhi = tmp - j;
     flo = 1.0e0 - fhi;
     j = j + 1; // F90 arrays start with 1, using Array1D<Real,1,size>
-   
+
     ahp   = flo*atomic_rates->AlphaHp  (j) + fhi*atomic_rates->AlphaHp  (j+1);
     ahep  = flo*atomic_rates->AlphaHep (j) + fhi*atomic_rates->AlphaHep (j+1);
     ahepp = flo*atomic_rates->AlphaHepp(j) + fhi*atomic_rates->AlphaHepp(j+1);

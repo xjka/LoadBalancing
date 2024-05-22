@@ -252,14 +252,13 @@ Nyx::advance_hydro_plus_particles (Real time,
                 Nyx::theActiveParticles()[i]->moveKickDrift(grav_vec_old, lev, dt, a_old, a_half, where_width);
 
             // Only need the coarsest virtual particles here.
-            if (lev == level && level < finest_level)
+                if (lev == level && level < finest_level)
                 for (int i = 0; i < Nyx::theVirtualParticles().size(); i++)
                    Nyx::theVirtualParticles()[i]->moveKickDrift(grav_vec_old, lev, dt, a_old, a_half, where_width);
-                
+
             // Miiiight need all Ghosts
             for (int i = 0; i < Nyx::theGhostParticles().size(); i++)
                Nyx::theGhostParticles()[i]->moveKickDrift(grav_vec_old, lev, dt, a_old, a_half, where_width);
-            
 #ifdef NEUTRINO_DARK_PARTICLES
             for (int i = 0; i < Nyx::theActiveParticles().size() && neutrino_cfl >= 1; i++)
                 Nyx::theActiveParticles()[i]->Redistribute();

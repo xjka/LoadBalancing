@@ -4,8 +4,6 @@ add_subdirectory(AMR-density)
 
 add_subdirectory(LyA)
 
-add_subdirectory(LoadBalancingTests)
-
 if (Nyx_HEATCOOL)
   # add_subdirectory(LyA_AGN)  # This is broken
 endif ()

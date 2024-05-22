@@ -319,14 +319,14 @@ Nyx::read_params ()
         {
             if (DefaultGeometry().isPeriodic(dir))
             {
-                if (lo_bc[dir] != Interior)
+                if (lo_bc[dir] != amrex::PhysBCType::interior)
                 {
                     std::cerr << "Nyx::read_params:periodic in direction "
                               << dir
                               << " but low BC is not Interior" << std::endl;
                     amrex::Error();
                 }
-                if (hi_bc[dir] != Interior)
+                if (hi_bc[dir] != amrex::PhysBCType::interior)
                 {
                     std::cerr << "Nyx::read_params:periodic in direction "
                               << dir
@@ -343,14 +343,14 @@ Nyx::read_params ()
         //
         for (int dir = 0; dir < AMREX_SPACEDIM; dir++)
         {
-            if (lo_bc[dir] == Interior)
+            if (lo_bc[dir] == amrex::PhysBCType::interior)
             {
                 std::cerr << "Nyx::read_params:interior bc in direction "
                           << dir
                           << " but not periodic" << std::endl;
                 amrex::Error();
             }
-            if (hi_bc[dir] == Interior)
+            if (hi_bc[dir] == amrex::PhysBCType::interior)
             {
                 std::cerr << "Nyx::read_params:interior bc in direction "
                           << dir
@@ -962,8 +962,8 @@ Nyx::est_time_step (Real /*dt_old*/)
                   amrex::Real dt_gpu = 1.e37;
 #endif
 
-                  for (int k = lo.z; k <= hi.z; ++k) {
-                    for (int j = lo.y; j <= hi.y; ++j) {
+                  for         (int k = lo.z; k <= hi.z; ++k) {
+                    for     (int j = lo.y; j <= hi.y; ++j) {
                       for (int i = lo.x; i <= hi.x; ++i) {
                         if(u(i,j,k,Density_comp)<=1.1*local_small_dens && local_max_temp_dt==1)
                           continue;
@@ -1789,112 +1789,110 @@ Nyx::postCoarseTimeStep (Real cumtime)
 #ifdef AMREX_PARTICLES
     if(load_balance_int >= 0 && nStep() % load_balance_int == 0 && (new_a >= 1.0/(load_balance_start_z + 1.0)))
     {
-        if(verbose>0)
-            amrex::Print()<<"Load balancing since "<<nStep()<<" mod "<<load_balance_int<<" == 0"<<std::endl;
+      if(verbose>0)
+        amrex::Print()<<"Load balancing since "<<nStep()<<" mod "<<load_balance_int<<" == 0"<<std::endl;
 
-        for (int lev = 0; lev <= parent->finestLevel(); lev++)
+    for (int lev = 0; lev <= parent->finestLevel(); lev++)
+    {
+
+        Nyx* cs = dynamic_cast<Nyx*>(&parent->getLevel(lev));
+        Vector<long> wgts(parent->boxArray(lev).size());
+        DistributionMapping dm;
+        BoxArray ba;
+  
+        //ACJ
+        if(dual_grid_load_balance)
         {
-
-            Nyx* cs = dynamic_cast<Nyx*>(&parent->getLevel(lev));
-            Vector<long> wgts(parent->boxArray(lev).size());
-            DistributionMapping dm;
-            BoxArray ba;
-            //ACJ
-            if(dual_grid_load_balance)
-            {
-              theDMPC()->Redistribute(); //to make sure particles are over the proper grids
-              //theDMPC()->load_balance(lev, overload_toler, min_grid_size, ba, dm);
-              theDMPC()->load_balance(lev, parent->boxArray(lev), parent->DistributionMap(lev), 
+            theDMPC()->Redistribute(); //to make sure particles are over the proper grids
+            //theDMPC()->load_balance(lev, overload_toler, min_grid_size, ba, dm);
+            theDMPC()->load_balance(lev, parent->boxArray(lev), parent->DistributionMap(lev), 
                                           overload_toler, min_grid_size, ba, dm);              
-            }
-            else
-            {
-                //Should these weights be constructed based on level=0, or lev from for?
-                if(load_balance_wgt_strategy == 0)
-                {
-                    for (unsigned int i = 0; i < wgts.size(); i++)
-                    {
-                        wgts[i] = parent->boxArray(lev)[i].numPts();
-                    }
-                    if(load_balance_strategy==DistributionMapping::Strategy::KNAPSACK)
-                        dm.KnapSackProcessorMap(wgts, load_balance_wgt_nmax);
-                    else if(load_balance_strategy==DistributionMapping::Strategy::SFC)
-                        dm.SFCProcessorMap(parent->boxArray(lev), wgts, load_balance_wgt_nmax);
-                    else if(load_balance_strategy==DistributionMapping::Strategy::ROUNDROBIN)
-                        dm.RoundRobinProcessorMap(wgts, load_balance_wgt_nmax);
-                }
-                else if(load_balance_wgt_strategy == 1)
-                {
-                    wgts = cs->theDMPC()->NumberOfParticlesInGrid(lev,false,false);
-                    if(load_balance_strategy==DistributionMapping::Strategy::KNAPSACK)
-                        dm.KnapSackProcessorMap(wgts, load_balance_wgt_nmax);
-                    else if(load_balance_strategy==DistributionMapping::Strategy::SFC)
-                      dm.SFCProcessorMap(parent->boxArray(lev), wgts, load_balance_wgt_nmax);
-                    else if(load_balance_strategy==DistributionMapping::Strategy::ROUNDROBIN)
-                        dm.RoundRobinProcessorMap(wgts, load_balance_wgt_nmax);
-                }
-                else if(load_balance_wgt_strategy == 2)
-                {
-                    MultiFab particle_mf(parent->boxArray(lev),theDMPC()->ParticleDistributionMap(lev),1,1);
-                    cs->theDMPC()->Increment(particle_mf, lev);
-                    if(load_balance_strategy==DistributionMapping::Strategy::KNAPSACK)
-                        dm = DistributionMapping::makeKnapSack(particle_mf, load_balance_wgt_nmax);
-                    else if(load_balance_strategy==DistributionMapping::Strategy::SFC)
-                        dm = DistributionMapping::makeSFC(particle_mf, load_balance_wgt_nmax);
-                    else if(load_balance_strategy==DistributionMapping::Strategy::ROUNDROBIN)
-                        dm = DistributionMapping::makeRoundRobin(particle_mf);
-                }
-                else
-                {
-                    amrex::Abort("Selected load balancing strategy not implemented");
-                }
-            }
-            //ACJ
-
-            amrex::Gpu::Device::streamSynchronize();
-            const DistributionMapping& newdmap = dm;
-
-            //ACJ
-            amrex::BoxArray newboxarray;
-            if(dual_grid_load_balance)
-                newboxarray = ba; 
-            else
-                newboxarray = parent->boxArray(lev);
-            //ACJ
-
-
-            if(verbose > 2)
-              amrex::Print()<<"Using ba: "<<newboxarray<<"\nUsing dm: "<<newdmap<<std::endl;     
-            
-            for (int i = 0; i < theActiveParticles().size(); i++)
-            {
-                 if(lev > 0)
-                     amrex::Abort("Particle load balancing needs multilevel testing");
-              /*
-                 cs->theActiveParticles()[i]->Redistribute(lev,
-                                                           theActiveParticles()[i]->finestLevel(),
-                                                           1);
-              */
-                 cs->theActiveParticles()[i]->Regrid(newdmap, newboxarray, lev); //ACJ
-
-                 if(shrink_to_fit)
-                     cs->theActiveParticles()[i]->ShrinkToFit(); 
-            }
-            
-
-            if(cs->Nyx::theVirtPC() != 0)
-            {
-                cs->Nyx::theVirtPC()->Regrid(newdmap, newboxarray, lev);
-            }
-
-            if(cs->Nyx::theGhostPC() != 0)
-            {
-                cs->Nyx::theGhostPC()->Regrid(newdmap, newboxarray, lev);
-            }
-
-            amrex::Gpu::streamSynchronize();
         }
+        else 
+        {
+            //Should these weights be constructed based on level=0, or lev from for?
+            if(load_balance_wgt_strategy == 0)
+            {
+                for (unsigned int i = 0; i < wgts.size(); i++)
+                {
+                    wgts[i] = parent->boxArray(lev)[i].numPts();
+                }
+                if(load_balance_strategy==DistributionMapping::Strategy::KNAPSACK)
+                    dm.KnapSackProcessorMap(wgts, load_balance_wgt_nmax);
+                else if(load_balance_strategy==DistributionMapping::Strategy::SFC)
+                    dm.SFCProcessorMap(parent->boxArray(lev), wgts, load_balance_wgt_nmax);
+                else if(load_balance_strategy==DistributionMapping::Strategy::ROUNDROBIN)
+                    dm.RoundRobinProcessorMap(wgts, load_balance_wgt_nmax);
+            }
+            else if(load_balance_wgt_strategy == 1)
+            {
+                wgts = cs->theDMPC()->NumberOfParticlesInGrid(lev,false,false);
+                if(load_balance_strategy==DistributionMapping::Strategy::KNAPSACK)
+                    dm.KnapSackProcessorMap(wgts, load_balance_wgt_nmax);
+                else if(load_balance_strategy==DistributionMapping::Strategy::SFC)
+                  dm.SFCProcessorMap(parent->boxArray(lev), wgts, load_balance_wgt_nmax);
+                else if(load_balance_strategy==DistributionMapping::Strategy::ROUNDROBIN)
+                    dm.RoundRobinProcessorMap(wgts, load_balance_wgt_nmax);
+            }
+            else if(load_balance_wgt_strategy == 2)
+            {
+                MultiFab particle_mf(parent->boxArray(lev),theDMPC()->ParticleDistributionMap(lev),1,1);
+                cs->theDMPC()->Increment(particle_mf, lev);
+                if(load_balance_strategy==DistributionMapping::Strategy::KNAPSACK)
+                    dm = DistributionMapping::makeKnapSack(particle_mf, load_balance_wgt_nmax);
+                else if(load_balance_strategy==DistributionMapping::Strategy::SFC)
+                    dm = DistributionMapping::makeSFC(particle_mf, load_balance_wgt_nmax);
+                else if(load_balance_strategy==DistributionMapping::Strategy::ROUNDROBIN)
+                    dm = DistributionMapping::makeRoundRobin(particle_mf);
+            }
+            else
+            {
+                amrex::Abort("Selected load balancing strategy not implemented");
+            }
+        }
+        //ACJ
+        amrex::Gpu::Device::streamSynchronize();
+        const DistributionMapping& newdmap = dm;
+           
+        //ACJ
+        amrex::BoxArray newboxarray;
+        if(dual_grid_load_balance)
+            newboxarray = ba; 
+        else
+            newboxarray = parent->boxArray(lev);
+        //ACJ
+
+        if(verbose > 2)
+          amrex::Print()<<"Using ba: "<<newboxarray<<"\nUsing dm: "<<newdmap<<std::endl;        
+        for (int i = 0; i < theActiveParticles().size(); i++)
+        {
+             if(lev > 0)
+                 amrex::Abort("Particle load balancing needs multilevel testing");
+          /*
+             cs->theActiveParticles()[i]->Redistribute(lev,
+                                                       theActiveParticles()[i]->finestLevel(),
+                                                       1);
+          */
+             cs->theActiveParticles()[i]->Regrid(newdmap, newboxarray, lev); //ACJ
+
+             if(shrink_to_fit)
+                 cs->theActiveParticles()[i]->ShrinkToFit();
+        }
+
+        if(cs->Nyx::theVirtPC() != 0)
+        {
+            cs->Nyx::theVirtPC()->Regrid(newdmap, newboxarray, lev);
+        }
+
+        if(cs->Nyx::theGhostPC() != 0)
+        {
+            cs->Nyx::theGhostPC()->Regrid(newdmap, newboxarray, lev);
+        }
+
+        amrex::Gpu::streamSynchronize();
     }
+
+   }
 #endif
    AmrLevel::postCoarseTimeStep(cumtime);
 

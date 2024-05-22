@@ -958,12 +958,12 @@ Gravity::make_mg_bc ()
             mlmg_lobc[idim] = MLLinOp::BCType::Periodic;
             mlmg_hibc[idim] = MLLinOp::BCType::Periodic;
         } else {
-            if (phys_bc->lo(idim) == Symmetry) {
+            if (phys_bc->lo(idim) == amrex::PhysBCType::symmetry) {
                 mlmg_lobc[idim] = MLLinOp::BCType::Neumann;
             } else {
                 mlmg_lobc[idim] = MLLinOp::BCType::Dirichlet;
             }
-            if (phys_bc->hi(idim) == Symmetry) {
+            if (phys_bc->hi(idim) == amrex::PhysBCType::symmetry) {
                 mlmg_hibc[idim] = MLLinOp::BCType::Neumann;
             } else {
                 mlmg_hibc[idim] = MLLinOp::BCType::Dirichlet;
@@ -1055,19 +1055,17 @@ Gravity::AddParticlesToRhs (int               level,
     MultiFab particle_mf(grids[level], dmap[level], 1, ngrow);
 
     for (int i = 0; i < Nyx::theActiveParticles().size(); i++)
-      {
+    {
         Nyx::theActiveParticles()[i]->AssignDensitySingleLevel(particle_mf, level);
-        amrex::Gpu::Device::streamSynchronize();
+        amrex::Gpu::Device::streamSynchronize(); 
         //ACJ: modified to accomodate dual_grids
         if(particle_mf.DistributionMap() == Rhs.DistributionMap() && 
-                particle_mf.boxArray().CellEqual(Rhs.boxArray())) //ACJ
+                  particle_mf.boxArray().CellEqual(Rhs.boxArray())) //ACJ
             MultiFab::Add(Rhs, particle_mf, 0, 0, 1, 0);
         else //ACJ
             Rhs.ParallelAdd(particle_mf); //ACJ
-        
         //ACJ
-      }
-
+    }
     amrex::Gpu::Device::streamSynchronize();
 
 }
@@ -1101,11 +1099,11 @@ Gravity::AddParticlesToRhs(int base_level, int finest_level, int ngrow, const Ve
 
         for (int lev = 0; lev < num_levels; lev++)
         {
-            if ((*PartMF[lev]).DistributionMap() == (*Rhs_particles[lev]).DistributionMap() &&
-                (*PartMF[lev]).boxArray().CellEqual((*Rhs_particles[lev]).boxArray()))
-                MultiFab::Add(*Rhs_particles[lev], *PartMF[lev], 0, 0, 1, 0);
-            else
-                Rhs_particles[lev]->ParallelAdd(*PartMF[lev]);
+        if ((*PartMF[lev]).DistributionMap() == (*Rhs_particles[lev]).DistributionMap() &&
+            (*PartMF[lev]).boxArray().CellEqual((*Rhs_particles[lev]).boxArray()))
+            MultiFab::Add(*Rhs_particles[lev], *PartMF[lev], 0, 0, 1, 0);
+        else
+            Rhs_particles[lev]->ParallelAdd(*PartMF[lev]);
         }
     }
     amrex::Gpu::Device::streamSynchronize();
@@ -1134,6 +1132,7 @@ Gravity::AddVirtualParticlesToRhs (int               level,
                 MultiFab::Add(Rhs, particle_mf, 0, 0, 1, 0);
             else                                //ACJ
                 Rhs.ParallelAdd(particle_mf);   //ACJ
+
         }
     }
 
@@ -1159,6 +1158,7 @@ Gravity::AddVirtualParticlesToRhs(int finest_level, const Vector<MultiFab*>& Rhs
                 MultiFab::Add(*Rhs_particles[finest_level], VirtPartMF, 0, 0, 1, 0);
             else                                                       //ACJ
                 Rhs_particles[finest_level]->ParallelAdd(VirtPartMF);  //ACJ
+
         }
     }
     amrex::Gpu::Device::streamSynchronize();
@@ -1188,6 +1188,7 @@ Gravity::AddGhostParticlesToRhs (int               level,
                 MultiFab::Add(Rhs, ghost_mf, 0, 0, ncomp, 0);
             else                           //ACJ
                 Rhs.ParallelAdd(ghost_mf); //ACJ
+
         }
     }
     amrex::Gpu::Device::streamSynchronize();
@@ -1197,7 +1198,6 @@ void
 Gravity::AddGhostParticlesToRhs(int level, const Vector<MultiFab*>& Rhs_particles)
 {
     BL_PROFILE("Gravity::AddGhostParticlesToRhsML()");
-
 
     if (level > 0)
     {
@@ -1453,8 +1453,8 @@ Gravity::set_boundary(BndryData& bd, MultiFab& rhs, const Real* dx)
       //  across an interior boundary or a periodic boundary.
       {
         // Define the type of boundary conditions to be Dirichlet (even for periodic)
-        bd.setBoundCond(Orientation(n, Orientation::low) ,i,0,LO_DIRICHLET);
-        bd.setBoundCond(Orientation(n, Orientation::high),i,0,LO_DIRICHLET);
+        bd.setBoundCond(Orientation(n, Orientation::low) ,i,0,AMREX_LO_DIRICHLET);
+        bd.setBoundCond(Orientation(n, Orientation::high),i,0,AMREX_LO_DIRICHLET);
 
         // Set the boundary conditions to the cell centers outside the domain
         bd.setBoundLoc(Orientation(n, Orientation::low) ,i,0.5*dx[n]);

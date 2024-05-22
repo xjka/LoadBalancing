@@ -21,7 +21,7 @@ public:
 
     using MyParIter = amrex::ParIter<1+AMREX_SPACEDIM>;
     using MyConstParIter = amrex::ParConstIter<1+AMREX_SPACEDIM>;
-     
+
     virtual ~DarkMatterParticleContainer () {}
 
     void InitCosmo1ppcMultiLevel(amrex::MultiFab& mf, const amrex::Real disp_fac[], const amrex::Real vel_fac[],
@@ -39,13 +39,13 @@ public:
     
     amrex::Vector<int> m_pboxid_to_fboxid; //ACJ
     void load_balance(int lev, const amrex::BoxArray& fba, const amrex::DistributionMapping& fdmap, amrex::Real overload_toler,  
-                    int min_grid_size, amrex::BoxArray &new_ba, amrex::DistributionMapping &new_dm); 
+                    int min_grid_size, amrex::BoxArray &new_ba, amrex::DistributionMapping &new_dm); //ACJ
     //void load_balance(int lev, amrex::Real overload_toler, int min_grid_size, amrex::BoxArray &new_ba, amrex::DistributionMapping &new_dm);
 
     long countParticle(int lev, amrex::iMultiFab& np_mf); //ACJ
     
     amrex::Box chop_and_distribute_box(amrex::Box &reamin, const amrex::Box &remain0, const amrex::IArrayBox& np_fab, int np_target,
-            int & new_box_np, int room, int np_box, int min_grid_size, bool &in_vs_out);
+            int & new_box_np, int room, int np_box, int min_grid_size, bool &in_vs_out); //ACJ
 
 };
 

@@ -154,7 +154,6 @@ Real Nyx::particle_cfl = 0.5;
 Real Nyx::neutrino_cfl = 0.5;
 #endif
 
-
 Vector<NyxParticleContainerBase*>&
 Nyx::theActiveParticles ()
 {
@@ -275,7 +274,7 @@ Nyx::read_particle_params ()
         pp.get("particle_init_type", particle_init_type);
         pp.query("init_with_sph_particles", init_with_sph_particles);
     }
-#endif 
+#endif
 
     pp.query("particle_initrandom_serialize", particle_initrandom_serialize);
     pp.query("particle_initrandom_count", particle_initrandom_count);
@@ -376,7 +375,6 @@ Nyx::read_particle_params ()
 #endif
 }
 
-
 void
 Nyx::init_particles ()
 {
@@ -391,23 +389,19 @@ Nyx::init_particles ()
     if (do_dm_particles)
     {
         BL_ASSERT (DMPC == 0);
-        
-          DMPC = new DarkMatterParticleContainer(parent); 
-
+        DMPC = new DarkMatterParticleContainer(parent);
         ActiveParticles.push_back(DMPC); 
 
-        if (init_with_sph_particles == 1){
-                SPHPC = new DarkMatterParticleContainer(parent);
-        }
+        if (init_with_sph_particles == 1)
+           SPHPC = new DarkMatterParticleContainer(parent);
 
         if (parent->subCycle())
         {
             VirtPC = new DarkMatterParticleContainer(parent);
             VirtualParticles.push_back(VirtPC); 
-            
+
             GhostPC = new DarkMatterParticleContainer(parent);
-            GhostParticles.push_back(GhostPC); 
-        }
+            GhostParticles.push_back(GhostPC); }
         //
         // Make sure to call RemoveParticlesOnExit() on exit.
         //
@@ -423,7 +417,7 @@ Nyx::init_particles ()
 #else
         Real tol = 1e-12;
 #endif
-        
+
         Real number_of_cells = Geom().ProbLength(0)/Geom().CellSize(0) *
                                Geom().ProbLength(1)/Geom().CellSize(1) *
                                Geom().ProbLength(2)/Geom().CellSize(2);
@@ -856,7 +850,7 @@ Nyx::init_santa_barbara (int init_sb_vels)
         if (inhomo_reion) init_zhi();
 
         BL_PROFILE_VAR_STOP(CA_init);
-
+        
         // Add the particle density to the gas density 
         if(particle_mf[level]->boxArray().CellEqual(S_new.boxArray()) && 
                 particle_mf[level]->DistributionMap()==S_new.DistributionMap()) //ACJ
@@ -1047,7 +1041,8 @@ Nyx::particle_est_time_step (Real& est_dt)
     const Real cur_time = state[PhiGrav_Type].curTime();
     const Real a = get_comoving_a(cur_time);
     MultiFab& grav = get_new_data(Gravity_Type);
-    const Real est_dt_particle = DMPC->estTimestep(grav, a, level, particle_cfl); 
+    const Real est_dt_particle = DMPC->estTimestep(grav, a, level, particle_cfl);
+
     if (est_dt_particle > 0) {
         est_dt = std::min(est_dt, est_dt_particle);
     }
@@ -1172,11 +1167,12 @@ Nyx::particle_redistribute (int lbase, bool my_init)
 
             int iteration = 1;
             for (int i = 0; i < theActiveParticles().size(); i++)
-            {
-                theActiveParticles()[i]->Redistribute(lbase,
+              {
+                  theActiveParticles()[i]->Redistribute(lbase,
                                                   theActiveParticles()[i]->finestLevel(),
-                                                  iteration); 
-            }
+                                                  iteration);
+
+              }
 
             //
             // Use the new BoxArray and DistMap to define ba and dm for next time.

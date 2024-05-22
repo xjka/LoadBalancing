@@ -69,7 +69,6 @@ enum StateType {
 static constexpr int max_prob_param = 20;
 #endif
 
-
 //
 // AmrLevel-derived class for hyperbolic conservation equations for stellar
 // media
@@ -804,11 +803,12 @@ int integrate_state_struct
     //! Create the Level_ and other directories in checkpoint and plot files
     virtual void CreateLevelDirectory (const std::string &dir) override;
     
-    static bool dual_grid_load_balance;  //ACJ
+    static bool dual_grid_load_balance; //ACJ
     static amrex::Real overload_toler;  //ACJ 
-    static int dual_grid_profile_freq; //ACJ
-    static int min_grid_size; //ACJ
-                              
+    static int dual_grid_profile_freq;  //ACJ
+    static int min_grid_size;           //ACJ
+
+
 protected:
 
     static void read_params();
@@ -920,7 +920,7 @@ protected:
     static int load_balance_wgt_strategy;
     static int load_balance_wgt_nmax;
     static int load_balance_strategy;
-    
+
     bool FillPatchedOldState_ok;
 
     // permits hydro to be turned on and off for running pure rad problems:
