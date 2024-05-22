@@ -765,7 +765,7 @@ int main(int argc, char **argv) {
     if (dmvars)
     {
     if (hydro || neutrinos || append) {
-        field_path = "native_fields/dm_density";
+        field_path = "native_fields/dark_matter_density"; //ACJ: changed to match field-name in gimlet2
     } else {
         field_path = "native_fields/matter_density";
     }
